@@ -55,3 +55,27 @@ A knowledge companion that grows with you — combining emotional depth, self-ev
 - Key inspiration: Heuris (knowledge-first), Amygdala (emotional state), Self-improvement (evolution)
 - Starting Next.js scaffolding...
 
+### 2026-02-03 18:10 UTC - Iteration 1: Core Setup
+- ✅ Next.js 15 project scaffolded
+- ✅ Installed deps: Convex, Clerk, OpenAI, Framer Motion, Lucide
+- ✅ Created Convex schema (users, emotions, conversations, messages, knowledgeCards, learningProgress, aiLearnings)
+- ✅ Created Convex functions (users, emotions, conversations, knowledge)
+- ✅ Set up Clerk auth with custom styling
+- ✅ Created landing page with animations
+- ✅ Created home page with daily cards + streak tracker
+- ✅ Created chat page with emotional context
+- ✅ Created library page with topic interests
+- ✅ Created profile page with AI relationship view
+- ✅ Set up API route for chat with emotional awareness
+- ✅ PWA manifest created
+- ✅ Build passing!
+- ✅ GitHub repo created: https://github.com/Ishnoor-Singh/nous-app
+- ⚠️ Vercel token invalid - need to fix
+
+### 2026-02-03 18:20 UTC - Iteration 2: Knowledge Exploration
+- ✅ Created explore/[cardId] page with topic-specific UI
+- ✅ Added starter questions per topic
+- ✅ Added depth tracking (1-5 scale)
+- ✅ Topic-specific gradients and icons
+- Next: Onboarding flow, voice mode, unique UX elements
+
