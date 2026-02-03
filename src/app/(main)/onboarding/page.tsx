@@ -359,15 +359,31 @@ function StyleStep({ data, updateData, onNext }: any) {
 function ReadyStep({ data, userData }: any) {
   const router = useRouter();
   const [isReady, setIsReady] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const completeOnboarding = useMutation(api.users.completeOnboarding);
 
   useEffect(() => {
     const timer = setTimeout(() => setIsReady(true), 1500);
     return () => clearTimeout(timer);
   }, []);
 
-  const handleStart = () => {
-    // In a real app, we'd save the onboarding data to Convex here
-    router.push("/home");
+  const handleStart = async () => {
+    if (!userData?.user?._id || isSaving) return;
+    
+    setIsSaving(true);
+    try {
+      await completeOnboarding({
+        userId: userData.user._id,
+        preferredName: data.preferredName,
+        interests: data.interests || [],
+        learningStyle: data.learningStyle || "narrative",
+      });
+      router.push("/home");
+    } catch (error) {
+      console.error("Failed to save onboarding data:", error);
+      // Still redirect on error to not block user
+      router.push("/home");
+    }
   };
 
   return (
@@ -409,7 +425,7 @@ function ReadyStep({ data, userData }: any) {
             onClick={handleStart}
             className="px-8 py-4 bg-accent text-accent-foreground rounded-2xl font-semibold flex items-center gap-2 hover:bg-accent/90 transition-colors animate-pulse-glow"
           >
-            Begin your journey
+            {isSaving ? "Setting up..." : "Begin your journey"}
             <Sparkles className="w-5 h-5" />
           </motion.button>
         )}

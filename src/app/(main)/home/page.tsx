@@ -4,6 +4,7 @@ import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Brain, Flame, BookOpen, MessageCircle, 
@@ -22,6 +23,7 @@ const TOPIC_CONFIG = {
 
 export default function HomePage() {
   const { user } = useUser();
+  const router = useRouter();
   const userData = useQuery(api.users.getUserWithState, {
     clerkId: user?.id || "",
   });
@@ -35,6 +37,13 @@ export default function HomePage() {
   const syncUser = useMutation(api.users.syncUser);
 
   const [greeting, setGreeting] = useState("");
+
+  // Redirect to onboarding if not completed
+  useEffect(() => {
+    if (userData?.user && userData?.learningProgress && !userData.learningProgress.preferredStyle) {
+      router.push("/onboarding");
+    }
+  }, [userData, router]);
 
   // Sync user on first load
   useEffect(() => {

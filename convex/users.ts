@@ -83,6 +83,51 @@ export const getUser = query({
   },
 });
 
+// Save onboarding preferences
+export const completeOnboarding = mutation({
+  args: {
+    userId: v.id("users"),
+    preferredName: v.string(),
+    interests: v.array(v.string()),
+    learningStyle: v.union(
+      v.literal("socratic"),
+      v.literal("narrative"),
+      v.literal("analytical"),
+      v.literal("visual")
+    ),
+  },
+  handler: async (ctx, args) => {
+    // Update user name if provided
+    await ctx.db.patch(args.userId, {
+      name: args.preferredName,
+    });
+
+    // Update learning progress with preferences
+    const progress = await ctx.db
+      .query("learningProgress")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .first();
+
+    if (progress) {
+      // Convert interests array to weighted topic interests
+      const topicInterests = {
+        philosophy: args.interests.includes("philosophy") ? 0.8 : 0.3,
+        history: args.interests.includes("history") ? 0.8 : 0.3,
+        economics: args.interests.includes("economics") ? 0.8 : 0.3,
+        art: args.interests.includes("art") ? 0.8 : 0.3,
+        psychology: args.interests.includes("psychology") ? 0.8 : 0.3,
+      };
+
+      await ctx.db.patch(progress._id, {
+        preferredStyle: args.learningStyle,
+        topicInterests,
+      });
+    }
+
+    return { success: true };
+  },
+});
+
 export const getUserWithState = query({
   args: { clerkId: v.string() },
   handler: async (ctx, args) => {

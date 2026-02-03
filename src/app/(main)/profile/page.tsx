@@ -6,9 +6,11 @@ import { api } from "../../../../convex/_generated/api";
 import { motion } from "framer-motion";
 import { 
   User, Flame, Brain, Settings, 
-  LogOut, Moon, Bell, Shield
+  LogOut, Trophy, BookOpen, Map,
+  Swords, ChevronRight
 } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 
 export default function ProfilePage() {
   const { user } = useUser();
@@ -121,18 +123,29 @@ export default function ProfilePage() {
         </div>
       </motion.section>
 
-      {/* Settings Links */}
+      {/* Quick Actions */}
       <motion.section
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.3 }}
-        className="space-y-2"
+        className="mb-8"
       >
-        <SettingsItem icon={<Bell />} label="Notifications" />
-        <SettingsItem icon={<Moon />} label="Appearance" />
-        <SettingsItem icon={<Shield />} label="Privacy" />
-        <SettingsItem icon={<Settings />} label="Settings" />
-        
+        <h2 className="text-lg font-semibold mb-4">More</h2>
+        <div className="space-y-2">
+          <ProfileLink href="/challenge" icon={<Swords />} label="Daily Challenge" desc="Test your knowledge" />
+          <ProfileLink href="/achievements" icon={<Trophy />} label="Achievements" desc="Your milestones" />
+          <ProfileLink href="/library" icon={<BookOpen />} label="Library" desc="Topics & history" />
+          <ProfileLink href="/paths" icon={<Map />} label="Learning Paths" desc="Guided journeys" />
+          <ProfileLink href="/settings" icon={<Settings />} label="Settings" desc="App preferences" />
+        </div>
+      </motion.section>
+
+      {/* Sign Out */}
+      <motion.section
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.4 }}
+      >
         <SignOutButton>
           <button className="w-full p-4 rounded-2xl bg-muted flex items-center gap-3 text-red-500 hover:bg-red-500/10 transition-colors">
             <LogOut className="w-5 h-5" />
@@ -158,11 +171,19 @@ function MiniStat({ label, value }: { label: string; value: number }) {
   );
 }
 
-function SettingsItem({ icon, label }: { icon: React.ReactNode; label: string }) {
+function ProfileLink({ href, icon, label, desc }: { href: string; icon: React.ReactNode; label: string; desc: string }) {
   return (
-    <button className="w-full p-4 rounded-2xl bg-muted flex items-center gap-3 hover:bg-secondary transition-colors">
-      <div className="text-muted-foreground">{icon}</div>
-      <span className="font-medium">{label}</span>
-    </button>
+    <Link href={href}>
+      <div className="w-full p-4 rounded-2xl bg-muted flex items-center gap-3 hover:bg-secondary transition-colors cursor-pointer">
+        <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent">
+          {icon}
+        </div>
+        <div className="flex-1">
+          <p className="font-medium">{label}</p>
+          <p className="text-xs text-muted-foreground">{desc}</p>
+        </div>
+        <ChevronRight className="w-5 h-5 text-muted-foreground" />
+      </div>
+    </Link>
   );
 }
