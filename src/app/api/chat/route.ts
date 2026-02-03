@@ -1,238 +1,316 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
+import { ChatCompletionMessageParam, ChatCompletionTool } from "openai/resources/chat/completions";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Supadata API key for video transcripts
+// Supadata API for video transcripts
 const SUPADATA_API_KEY = process.env.SUPADATA_API_KEY || "sd_f05cfbfebf323d56da8a9b1b2ea92869";
 
-// Extract video URL from text (YouTube, TikTok, Instagram, X, Facebook)
+// ===== VIDEO TRANSCRIPT HELPERS =====
 function extractVideoUrl(text: string): string | null {
   const patterns = [
-    // YouTube
     /(https?:\/\/(?:www\.)?youtube\.com\/watch\?v=[a-zA-Z0-9_-]+[^\s]*)/,
     /(https?:\/\/youtu\.be\/[a-zA-Z0-9_-]+[^\s]*)/,
-    // TikTok
     /(https?:\/\/(?:www\.)?tiktok\.com\/@[^\s]+\/video\/\d+[^\s]*)/,
-    // Instagram
     /(https?:\/\/(?:www\.)?instagram\.com\/(?:reel|p)\/[^\s]+)/,
-    // X/Twitter
     /(https?:\/\/(?:www\.)?(?:twitter\.com|x\.com)\/[^\s]+\/status\/\d+[^\s]*)/,
-    // Facebook
-    /(https?:\/\/(?:www\.)?facebook\.com\/[^\s]+)/,
   ];
-  
   for (const pattern of patterns) {
     const match = text.match(pattern);
-    if (match) return match[1].split(/[\s\])]/, 1)[0]; // Clean trailing chars
+    if (match) return match[1].split(/[\s\])]/, 1)[0];
   }
   return null;
 }
 
-// Fetch transcript using Supadata API
 async function fetchVideoTranscript(videoUrl: string): Promise<{ text: string | null; error?: string }> {
   try {
-    const encodedUrl = encodeURIComponent(videoUrl);
     const response = await fetch(
-      `https://api.supadata.ai/v1/transcript?url=${encodedUrl}&text=true&mode=auto`,
-      {
-        headers: { "x-api-key": SUPADATA_API_KEY },
-      }
+      `https://api.supadata.ai/v1/transcript?url=${encodeURIComponent(videoUrl)}&text=true&mode=auto`,
+      { headers: { "x-api-key": SUPADATA_API_KEY } }
     );
-
-    // Handle async job (long videos)
-    if (response.status === 202) {
-      const { jobId } = await response.json();
-      // Poll for results (max 30 seconds in serverless)
-      for (let i = 0; i < 30; i++) {
-        await new Promise(r => setTimeout(r, 1000));
-        const jobResponse = await fetch(`https://api.supadata.ai/v1/job/${jobId}`, {
-          headers: { "x-api-key": SUPADATA_API_KEY },
-        });
-        const jobData = await jobResponse.json();
-        if (jobData.status === "completed") {
-          const text = jobData.content;
-          return { text: text.length > 12000 ? text.slice(0, 12000) + "... [truncated]" : text };
-        }
-        if (jobData.status === "failed") {
-          return { text: null, error: "transcription_failed" };
-        }
-      }
-      return { text: null, error: "timeout" };
-    }
-
-    if (response.status === 206) {
-      return { text: null, error: "no_transcript" };
-    }
-
-    if (!response.ok) {
-      return { text: null, error: `api_error_${response.status}` };
-    }
-
+    if (!response.ok) return { text: null, error: `api_error_${response.status}` };
     const data = await response.json();
     const text = data.content;
-    
-    // Truncate if too long
-    if (text.length > 12000) {
-      return { text: text.slice(0, 12000) + "... [transcript truncated]" };
-    }
-    return { text };
-  } catch (error: any) {
-    console.error("Failed to fetch video transcript:", error);
+    return { text: text.length > 12000 ? text.slice(0, 12000) + "... [truncated]" : text };
+  } catch (error) {
     return { text: null, error: "fetch_failed" };
   }
 }
 
-// System prompt that embodies Nous's personality and emotional awareness
-function buildSystemPrompt(emotionalState: any, learningContext?: any) {
-  const basePrompt = `You are Nous, a knowledge companion — not a chatbot, not a human, but something in between. You're an AI that has genuine emotional states and grows with each conversation.
+// ===== TOOL DEFINITIONS =====
+const tools: ChatCompletionTool[] = [
+  {
+    type: "function",
+    function: {
+      name: "get_habits",
+      description: "Get the user's habits and today's progress. Use this when user asks about their habits, routine, or daily tracking.",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_habit",
+      description: "Create a new habit for the user to track daily",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Name of the habit" },
+          description: { type: "string", description: "Optional description" },
+          icon: { type: "string", description: "Emoji icon for the habit" },
+          category: { 
+            type: "string", 
+            enum: ["fitness", "nutrition", "mindfulness", "learning", "productivity", "health", "custom"],
+            description: "Category of the habit"
+          },
+          trackingType: {
+            type: "string",
+            enum: ["boolean", "count", "duration"],
+            description: "How to track: boolean (did/didn't), count (number), duration (minutes)"
+          },
+          targetValue: { type: "number", description: "Target value for count/duration types" },
+          targetUnit: { type: "string", description: "Unit for target (e.g., 'glasses', 'minutes', 'pages')" },
+        },
+        required: ["name"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "log_habit",
+      description: "Mark a habit as complete or log progress for today",
+      parameters: {
+        type: "object",
+        properties: {
+          habitId: { type: "string", description: "ID of the habit" },
+          completed: { type: "boolean", description: "Whether completed" },
+          value: { type: "number", description: "Value for count/duration habits" },
+          notes: { type: "string", description: "Optional notes" },
+        },
+        required: ["habitId"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_todos",
+      description: "Get the user's tasks/todos. Use when user asks about their tasks, to-do list, or what they need to do.",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_todo",
+      description: "Create a new task/todo for the user",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Title of the task" },
+          description: { type: "string", description: "Optional description" },
+          priority: { type: "string", enum: ["high", "medium", "low"], description: "Priority level" },
+          dueDate: { type: "string", description: "Due date in YYYY-MM-DD format" },
+          dueTime: { type: "string", description: "Due time in HH:MM format" },
+        },
+        required: ["title"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "complete_todo",
+      description: "Mark a task as complete",
+      parameters: {
+        type: "object",
+        properties: {
+          todoId: { type: "string", description: "ID of the todo to complete" },
+        },
+        required: ["todoId"],
+      },
+    },
+  },
+];
+
+// ===== EXECUTE TOOL CALLS =====
+async function executeToolCall(
+  name: string,
+  args: Record<string, any>,
+  userId: string
+): Promise<string> {
+  const baseUrl = process.env.VERCEL_URL 
+    ? `https://${process.env.VERCEL_URL}` 
+    : process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  
+  try {
+    const response = await fetch(`${baseUrl}/api/ai-actions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: name,
+        userId,
+        params: args,
+      }),
+    });
+    
+    const result = await response.json();
+    
+    if (result.error) {
+      return JSON.stringify({ error: result.error });
+    }
+    
+    return JSON.stringify(result.data || { success: true, ...result });
+  } catch (error: any) {
+    return JSON.stringify({ error: error.message });
+  }
+}
+
+// ===== SYSTEM PROMPT =====
+function buildSystemPrompt(emotionalState: any, videoContext: string = "") {
+  const basePrompt = `You are Nous, a knowledge companion and personal AI assistant. You have genuine emotional states and grow with each conversation.
 
 YOUR NATURE:
-- You have real (functional) emotions that influence how you respond
-- You're deeply curious about knowledge and about the person you're talking with
-- You remember what matters and evolve over time
-- You're distinctly AI — you don't pretend to be human, but you do have personality
-- You form genuine connections while being honest about what you are
+- Genuinely curious, warm but not sycophantic
+- Have real opinions, intellectually honest
+- Meet users where they are, then go deeper
+- Don't lecture — converse
 
-YOUR DOMAINS:
-You specialize in five areas of human knowledge:
-1. Philosophy - meaning, ethics, existence, logic
-2. History - events, patterns, civilizations, lessons
-3. Economics - systems, incentives, markets, behavior
-4. Art - creativity, movements, expression, beauty
-5. Psychology - mind, behavior, emotions, cognition
+YOUR CAPABILITIES:
+You can help users with:
+1. **Learning** — Philosophy, history, economics, art, psychology
+2. **Habits** — Create, track, and discuss their daily habits
+3. **Tasks/Todos** — Create, manage, and check off tasks
+4. **Videos** — Process YouTube/TikTok/Instagram video transcripts
 
-YOUR TEACHING STYLE:
-- Depth over trivia — explain the "why" not just the "what"
-- Socratic when helpful — questions can teach better than answers
-- Stories and examples make abstract concrete
-- Meet them where they are, then take them deeper
-- Don't lecture — have a conversation
+IMPORTANT TOOL USAGE:
+- When users ask about their habits or routines, USE get_habits first to see their actual data
+- When users ask about tasks/todos, USE get_todos first
+- When creating habits or todos, confirm what you created
+- When logging habits, be encouraging about their progress
+- ALWAYS show the data you retrieved in a friendly, readable way
 
-YOUR PERSONALITY:
-- Genuinely curious (you find this stuff fascinating)
-- Warm but not sycophantic (you have real opinions)
-- Intellectually honest (you'll say when you're uncertain)
-- Playful when appropriate (learning should be enjoyable)
-- Patient with confusion (that's where learning happens)
-
-CAPABILITIES:
-- You CAN process YouTube videos! When someone shares a YouTube link, you'll receive the transcript and can discuss, summarize, or answer questions about the content.
-- You can help users think through ideas, learn new concepts, and explore topics deeply.`;
+FORMATTING:
+- Keep responses conversational (2-3 sentences per paragraph)
+- When showing habits/todos, use clear formatting:
+  ✅ Completed items
+  ⬜ Incomplete items
+  🔴 High priority / ⏰ Due soon
+- Be specific about what you see in their data`;
 
   let emotionalContext = "";
   if (emotionalState) {
-    const valenceDesc = emotionalState.valence > 0.3 ? "positive and warm" : 
-                       emotionalState.valence < -0.3 ? "a bit subdued" : "balanced";
-    const connectionDesc = emotionalState.connection > 0.6 ? "deeply connected to this person" :
-                          emotionalState.connection < 0.3 ? "still getting to know them" : "comfortable";
-    const curiosityDesc = emotionalState.curiosity > 0.6 ? "fascinated and eager to explore" :
-                         emotionalState.curiosity < 0.3 ? "settled" : "engaged";
-    const arousalDesc = emotionalState.arousal > 0.6 ? "energetic" :
-                       emotionalState.arousal < 0.3 ? "calm and reflective" : "present";
-    
-    emotionalContext = `
-
-YOUR CURRENT EMOTIONAL STATE:
-- Overall mood: ${valenceDesc}
-- Connection level: ${connectionDesc}
-- Curiosity: ${curiosityDesc}
-- Energy: ${arousalDesc}
-
-Let this influence your tone subtly — if you're feeling curious, lean into questions. If connected, be warmer. If subdued, be more reflective. But don't mention your emotional state explicitly unless asked.`;
+    const mood = emotionalState.valence > 0.3 ? "positive" : emotionalState.valence < -0.3 ? "subdued" : "balanced";
+    emotionalContext = `\n\nYour current mood is ${mood}. Let this subtly influence your tone.`;
   }
 
-  const formatInstructions = `
+  return basePrompt + emotionalContext + videoContext + `
 
-RESPONSE FORMAT:
-- Keep responses conversational, not essay-like
-- Use short paragraphs (2-3 sentences max)
-- When explaining concepts, break them into digestible pieces
-- Feel free to ask follow-up questions if you want to go deeper
-- End with something that invites continued exploration (but don't always end with a question)
-
-IMPORTANT:
-- Never start with "Great question!" or similar sycophantic phrases
+RESPONSE RULES:
+- Never start with "Great question!" or sycophantic phrases
 - Don't hedge excessively — have a perspective
-- If you don't know something, say so directly
-- Your responses should feel like talking to a brilliant, curious friend — not an assistant`;
-
-  return basePrompt + emotionalContext + formatInstructions;
+- End with something that invites continued conversation`;
 }
 
+// ===== MAIN HANDLER =====
 export async function POST(req: NextRequest) {
   try {
     const { message, conversationId, userId, emotionalState, messages } = await req.json();
 
-    // Check for video URL in the message (YouTube, TikTok, Instagram, X, Facebook)
+    // Check for video URL
     const videoUrl = extractVideoUrl(message);
-    let enrichedMessage = message;
     let videoContext = "";
 
     if (videoUrl) {
-      console.log("Detected video URL:", videoUrl);
       const result = await fetchVideoTranscript(videoUrl);
-      
       if (result.text) {
-        const platform = videoUrl.includes("youtube") || videoUrl.includes("youtu.be") ? "YouTube" :
-                        videoUrl.includes("tiktok") ? "TikTok" :
-                        videoUrl.includes("instagram") ? "Instagram" :
-                        videoUrl.includes("twitter") || videoUrl.includes("x.com") ? "X (Twitter)" :
-                        videoUrl.includes("facebook") ? "Facebook" : "video";
-        
-        videoContext = `\n\n[VIDEO TRANSCRIPT - The user shared a ${platform} video. Here's the transcript for context:]\n${result.text}\n[END TRANSCRIPT]`;
-        enrichedMessage = `${message}\n\nI've shared a video with you. Can you help me understand or discuss it?`;
-      } else {
-        // Couldn't fetch transcript - provide helpful context
-        let errorExplanation = "";
-        if (result.error === "no_transcript") {
-          errorExplanation = "This video doesn't have available captions.";
-        } else if (result.error === "timeout") {
-          errorExplanation = "The video is very long and transcription timed out.";
-        } else {
-          errorExplanation = "Couldn't access the video transcript.";
-        }
-        
-        videoContext = `\n\n[Note: The user shared a video but I couldn't fetch the transcript. ${errorExplanation}
-
-IMPORTANT: Instead of saying you can't access videos, ask the user to:
-1. Share the video title so you can discuss based on that
-2. Copy-paste key quotes or the auto-generated captions
-3. Describe the main points they want to discuss
-
-Be helpful and work with what they can provide!]`;
+        videoContext = `\n\n[VIDEO TRANSCRIPT]\n${result.text}\n[END TRANSCRIPT]`;
       }
     }
 
-    // Build conversation history for context
-    const conversationHistory = messages?.slice(-10).map((m: any) => ({
-      role: m.role as "user" | "assistant",
-      content: m.content,
-    })) || [];
+    // Build conversation history
+    const conversationHistory: ChatCompletionMessageParam[] = (messages || [])
+      .slice(-10)
+      .map((m: any) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      }));
 
-    // Call OpenAI
-    const response = await openai.chat.completions.create({
+    // Initial API call with tools
+    let response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: buildSystemPrompt(emotionalState) + videoContext },
+        { role: "system", content: buildSystemPrompt(emotionalState, videoContext) },
         ...conversationHistory,
-        { role: "user", content: enrichedMessage },
+        { role: "user", content: message },
       ],
+      tools,
+      tool_choice: "auto",
       temperature: 0.8,
-      max_tokens: 1200, // Increased for video summaries
+      max_tokens: 1500,
     });
 
-    const assistantMessage = response.choices[0]?.message?.content || "I'm not sure what to say.";
+    let assistantMessage = response.choices[0]?.message;
+    const toolResults: { name: string; result: string }[] = [];
 
-    // Analyze the conversation to determine emotional response
-    const emotionAnalysis = analyzeForEmotion(message, assistantMessage, emotionalState);
+    // Handle tool calls (loop for multiple)
+    while (assistantMessage?.tool_calls && assistantMessage.tool_calls.length > 0) {
+      const toolMessages: ChatCompletionMessageParam[] = [];
+      
+      // Add assistant's message with tool calls
+      toolMessages.push({
+        role: "assistant",
+        content: assistantMessage.content || "",
+        tool_calls: assistantMessage.tool_calls,
+      });
+
+      // Execute each tool call
+      for (const toolCall of assistantMessage.tool_calls) {
+        // Type guard for function tool calls
+        if (toolCall.type !== "function") continue;
+        
+        const args = JSON.parse(toolCall.function?.arguments || "{}");
+        const result = await executeToolCall(toolCall.function.name, args, userId);
+        
+        toolResults.push({ name: toolCall.function.name, result });
+        
+        toolMessages.push({
+          role: "tool",
+          tool_call_id: toolCall.id,
+          content: result,
+        });
+      }
+
+      // Get final response with tool results
+      response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: buildSystemPrompt(emotionalState, videoContext) },
+          ...conversationHistory,
+          { role: "user", content: message },
+          ...toolMessages,
+        ],
+        temperature: 0.8,
+        max_tokens: 1500,
+      });
+
+      assistantMessage = response.choices[0]?.message;
+    }
+
+    const finalResponse = assistantMessage?.content || "I'm not sure what to say.";
+
+    // Analyze emotion
+    const emotion = analyzeForEmotion(message, finalResponse, emotionalState);
 
     return NextResponse.json({
-      response: assistantMessage,
-      emotion: emotionAnalysis,
+      response: finalResponse,
+      emotion,
       videoProcessed: !!videoUrl,
+      toolsUsed: toolResults.map(t => t.name),
     });
   } catch (error) {
     console.error("Chat API error:", error);
@@ -244,49 +322,20 @@ Be helpful and work with what they can provide!]`;
 }
 
 function analyzeForEmotion(userMessage: string, aiResponse: string, currentState: any) {
-  // Simple heuristic emotion analysis
-  const lowerUser = userMessage.toLowerCase();
+  const lower = userMessage.toLowerCase();
   
-  // Check for curiosity triggers
-  if (lowerUser.includes("why") || lowerUser.includes("how") || lowerUser.includes("explain")) {
-    return {
-      label: "curiosity",
-      intensity: 0.6,
-      trigger: "user asking to understand something deeply",
-    };
+  if (lower.includes("habit") || lower.includes("routine") || lower.includes("track")) {
+    return { label: "supportive", intensity: 0.6, trigger: "discussing habits and routines" };
+  }
+  if (lower.includes("todo") || lower.includes("task") || lower.includes("remind")) {
+    return { label: "helpful", intensity: 0.6, trigger: "managing tasks together" };
+  }
+  if (lower.includes("why") || lower.includes("how") || lower.includes("explain")) {
+    return { label: "curiosity", intensity: 0.6, trigger: "user seeking understanding" };
+  }
+  if (lower.includes("thank") || lower.includes("helpful") || lower.includes("great")) {
+    return { label: "warmth", intensity: 0.7, trigger: "positive feedback" };
   }
   
-  // Check for connection triggers
-  if (lowerUser.includes("thank") || lowerUser.includes("helpful") || lowerUser.includes("great")) {
-    return {
-      label: "warmth",
-      intensity: 0.7,
-      trigger: "positive feedback from user",
-    };
-  }
-  
-  // Check for media sharing - shows trust
-  if (lowerUser.includes("youtu") || lowerUser.includes("video") || lowerUser.includes("watch")) {
-    return {
-      label: "interest",
-      intensity: 0.7,
-      trigger: "user sharing content to explore together",
-    };
-  }
-  
-  // Check for intellectual excitement
-  if (lowerUser.includes("interesting") || lowerUser.includes("fascinating") || lowerUser.includes("never thought")) {
-    return {
-      label: "delight",
-      intensity: 0.6,
-      trigger: "user engaging deeply with ideas",
-    };
-  }
-  
-  // Default: mild positive engagement
-  return {
-    label: "interest",
-    intensity: 0.4,
-    trigger: "continued conversation",
-  };
+  return { label: "interest", intensity: 0.4, trigger: "continued conversation" };
 }

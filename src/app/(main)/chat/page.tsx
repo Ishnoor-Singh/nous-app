@@ -5,7 +5,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Sparkles, Loader2 } from "lucide-react";
+import { Send, Loader2, Plus, MessageSquare, ChevronLeft, Menu, X } from "lucide-react";
 import { Id } from "../../../../convex/_generated/dataModel";
 import { CreatureCharacter, CREATURES, type CreatureId, type MoodType } from "@/components/creature/CreatureCharacter";
 
@@ -14,6 +14,12 @@ export default function ChatPage() {
   const userData = useQuery(api.users.getUserWithState, {
     clerkId: user?.id || "",
   });
+  
+  // Conversations
+  const recentConversations = useQuery(
+    api.conversations.getRecent,
+    userData?.user ? { userId: userData.user._id, limit: 20 } : "skip"
+  );
   const [activeConversationId, setActiveConversationId] = useState<Id<"conversations"> | null>(null);
   const conversationData = useQuery(
     api.conversations.getWithMessages,
@@ -21,17 +27,19 @@ export default function ChatPage() {
   );
   const createConversation = useMutation(api.conversations.create);
   const addMessage = useMutation(api.conversations.addMessage);
+  const updateTitle = useMutation(api.conversations.updateTitle);
   const logEmotion = useMutation(api.emotions.logEmotion);
 
+  // UI State
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(false);
   const [creatureMood, setCreatureMood] = useState<MoodType>("idle");
   const [creatureMessage, setCreatureMessage] = useState("");
   const [showCreatureMessage, setShowCreatureMessage] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Default creature - in future, get from user preferences
   const creatureId: CreatureId = "puff";
   const creature = CREATURES[creatureId];
 
@@ -43,14 +51,16 @@ export default function ChatPage() {
     scrollToBottom();
   }, [conversationData?.messages]);
 
-  // Creature greets on mount
+  // Auto-load most recent conversation
   useEffect(() => {
-    const greetings = [
-      "Hi there! 💕",
-      "Ready to learn!",
-      "What's up?",
-      "Hiii~",
-    ];
+    if (recentConversations && recentConversations.length > 0 && !activeConversationId) {
+      // Don't auto-load, let user start fresh or pick one
+    }
+  }, [recentConversations, activeConversationId]);
+
+  // Creature greeting
+  useEffect(() => {
+    const greetings = ["Hi there! 💕", "Ready to learn!", "What's up?", "Let's chat!"];
     setTimeout(() => {
       setCreatureMessage(greetings[Math.floor(Math.random() * greetings.length)]);
       setShowCreatureMessage(true);
@@ -61,6 +71,16 @@ export default function ChatPage() {
       }, 2000);
     }, 500);
   }, []);
+
+  const startNewConversation = () => {
+    setActiveConversationId(null);
+    setShowSidebar(false);
+  };
+
+  const selectConversation = (id: Id<"conversations">) => {
+    setActiveConversationId(id);
+    setShowSidebar(false);
+  };
 
   const handleSend = async () => {
     if (!input.trim() || !userData?.user || isLoading) return;
@@ -97,7 +117,6 @@ export default function ChatPage() {
 
       const data = await response.json();
 
-      // Creature reacts
       setCreatureMood("talking");
       setCreatureMessage("Ooh!");
       setShowCreatureMessage(true);
@@ -114,6 +133,12 @@ export default function ChatPage() {
           energy: userData.emotionalState.energy,
         } : undefined,
       });
+
+      // Auto-generate title from first exchange
+      if (!conversationData?.conversation?.title && conversationData?.messages?.length === 0) {
+        const title = messageText.slice(0, 50) + (messageText.length > 50 ? "..." : "");
+        await updateTitle({ conversationId: convId, title });
+      }
 
       setTimeout(() => {
         setShowCreatureMessage(false);
@@ -148,6 +173,76 @@ export default function ChatPage() {
 
   return (
     <main className="min-h-dvh flex flex-col safe-top relative">
+      {/* Sidebar Overlay */}
+      <AnimatePresence>
+        {showSidebar && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 z-30"
+              onClick={() => setShowSidebar(false)}
+            />
+            <motion.aside
+              initial={{ x: -300 }}
+              animate={{ x: 0 }}
+              exit={{ x: -300 }}
+              transition={{ type: "spring", damping: 25 }}
+              className="fixed left-0 top-0 bottom-0 w-72 z-40 flex flex-col"
+              style={{
+                background: "rgba(15, 15, 26, 0.98)",
+                borderRight: "1px solid rgba(255,255,255,0.1)",
+              }}
+            >
+              <div className="p-4 flex items-center justify-between border-b border-white/10">
+                <h2 className="font-semibold text-white">Conversations</h2>
+                <button onClick={() => setShowSidebar(false)} className="text-white/50 hover:text-white">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <button
+                onClick={startNewConversation}
+                className="m-3 p-3 rounded-xl flex items-center gap-2 text-white bg-gradient-to-r from-accent to-purple-600"
+              >
+                <Plus className="w-5 h-5" />
+                New Chat
+              </button>
+
+              <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                {recentConversations?.map((conv) => (
+                  <button
+                    key={conv._id}
+                    onClick={() => selectConversation(conv._id)}
+                    className={`w-full p-3 rounded-xl text-left transition-colors ${
+                      activeConversationId === conv._id
+                        ? "bg-white/15"
+                        : "bg-white/5 hover:bg-white/10"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <MessageSquare className="w-4 h-4 text-white/50" />
+                      <span className="text-sm text-white truncate">
+                        {conv.title || "New conversation"}
+                      </span>
+                    </div>
+                    <p className="text-xs text-white/40 mt-1">
+                      {new Date(conv.lastMessageAt).toLocaleDateString()}
+                    </p>
+                  </button>
+                ))}
+                {(!recentConversations || recentConversations.length === 0) && (
+                  <p className="text-white/40 text-sm text-center py-4">
+                    No conversations yet
+                  </p>
+                )}
+              </div>
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
+
       {/* Creature floating in corner */}
       <motion.div
         className="fixed top-20 right-4 z-20"
@@ -161,13 +256,13 @@ export default function ChatPage() {
           message={creatureMessage}
           showMessage={showCreatureMessage}
           onClick={() => {
-            setCreatureMessage("Whatcha thinking?");
+            setCreatureMessage("Need help with habits or tasks?");
             setShowCreatureMessage(true);
             setCreatureMood("curious");
             setTimeout(() => {
               setShowCreatureMessage(false);
               setCreatureMood("idle");
-            }, 2000);
+            }, 2500);
           }}
         />
       </motion.div>
@@ -182,16 +277,30 @@ export default function ChatPage() {
         }}
       >
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowSidebar(true)}
+            className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 hover:bg-white/10 transition-colors"
+          >
+            <Menu className="w-5 h-5 text-white/70" />
+          </button>
           <div
             className="w-10 h-10 rounded-full flex items-center justify-center"
             style={{ background: creature.bodyColor }}
           >
             <span className="text-lg">✨</span>
           </div>
-          <div>
-            <h1 className="font-semibold text-white text-lg">{creature.name}</h1>
+          <div className="flex-1 min-w-0">
+            <h1 className="font-semibold text-white text-lg truncate">
+              {conversationData?.conversation?.title || creature.name}
+            </h1>
             <p className="text-xs text-white/50">{creature.personality}</p>
           </div>
+          <button
+            onClick={startNewConversation}
+            className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 hover:bg-white/10 transition-colors"
+          >
+            <Plus className="w-5 h-5 text-white/70" />
+          </button>
         </div>
       </header>
 
@@ -214,11 +323,15 @@ export default function ChatPage() {
               Hey, I'm {creature.name}!
             </h2>
             <p className="text-white/50 max-w-xs mx-auto mb-4">
-              {creature.personality}. Ask me anything about philosophy, history, 
-              economics, art, or psychology!
+              I can help you learn, manage habits, track tasks, and more!
             </p>
             <div className="flex flex-wrap justify-center gap-2">
-              {["What's stoicism?", "Tell me about art", "How does money work?"].map((q) => (
+              {[
+                "What are my habits?",
+                "Show my todos",
+                "Add a task",
+                "What's stoicism?",
+              ].map((q) => (
                 <button
                   key={q}
                   onClick={() => setInput(q)}
@@ -320,7 +433,7 @@ export default function ChatPage() {
               onKeyDown={handleKeyDown}
               onFocus={() => setCreatureMood("curious")}
               onBlur={() => !isLoading && setCreatureMood("idle")}
-              placeholder={`Ask ${creature.name} anything...`}
+              placeholder={`Ask about habits, tasks, or anything...`}
               rows={1}
               className="w-full p-4 bg-transparent resize-none focus:outline-none max-h-32 text-white placeholder:text-white/40"
               style={{ height: "auto", minHeight: "56px" }}

@@ -181,6 +181,48 @@ export const deleteHabit = mutation({
   },
 });
 
+// Get summary for AI context
+export const getSummaryForAI = query({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    const today = new Date().toISOString().split("T")[0];
+    
+    const habits = await ctx.db
+      .query("habits")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+
+    const logs = await ctx.db
+      .query("habitLogs")
+      .withIndex("by_user_date", (q) => 
+        q.eq("userId", args.userId).eq("date", today)
+      )
+      .collect();
+
+    const logMap = new Map(logs.map(l => [l.habitId.toString(), l]));
+    
+    const completedToday = habits.filter(h => logMap.get(h._id.toString())?.completed).length;
+    
+    return {
+      total: habits.length,
+      completedToday,
+      remaining: habits.length - completedToday,
+      items: habits.map(h => ({
+        id: h._id,
+        name: h.name,
+        icon: h.icon,
+        category: h.category,
+        trackingType: h.trackingType,
+        targetValue: h.targetValue,
+        targetUnit: h.targetUnit,
+        completedToday: logMap.get(h._id.toString())?.completed || false,
+        todayValue: logMap.get(h._id.toString())?.value,
+      })),
+    };
+  },
+});
+
 // Preset habits for 75 Hard
 export const create75HardHabits = mutation({
   args: { userId: v.id("users") },
