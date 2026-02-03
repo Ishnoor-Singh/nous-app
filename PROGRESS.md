@@ -152,3 +152,45 @@ A knowledge companion that grows with you — combining emotional depth, self-ev
 
 ### Total Time: ~2.5 hours of continuous iteration
 
+### 2026-02-03 18:55 UTC - Saphira Iteration: Proactive Life Companion
+- ✅ Fixed onboarding to actually save preferences to Convex
+- ✅ Added redirect to onboarding for new users
+- ✅ Improved profile page with links to all features
+
+- ✅ **Habits System** (`/habits`)
+  - Schema: habits, habitLogs tables
+  - 75 Hard Challenge preset (all 7 daily habits)
+  - Custom habit creation with categories
+  - Streak tracking, progress visualization
+  
+- ✅ **AI Journaling** (`/journal`)
+  - Schema: journalEntries table
+  - AI-generated prompts based on context
+  - Nous reflection responses with theme detection
+  - Mood tracking, streak tracking
+  - API: /api/journal for AI reflections
+  
+- ✅ **Media Inbox** (`/inbox`)
+  - Schema: savedMedia table with full-text search
+  - Support for YouTube, articles, podcasts, tweets, books
+  - AI summary generation, key point extraction
+  - User highlights and notes
+  - API: /api/process-media for AI processing
+  
+- ✅ Profile page now links to all features
+- ✅ Build passing with 21 routes
+- ✅ Deployed to Vercel
+
+**To fully enable backend features:**
+```bash
+cd nous-app
+npx convex dev  # Push schema + generate types
+```
+
+### Route Summary (21 total)
+**Main Pages:** /, /home, /chat, /habits, /journal, /inbox, /profile, /insights
+**Knowledge:** /explore/[cardId], /library, /paths, /challenge, /achievements
+**Settings:** /settings, /onboarding
+**API:** /api/chat, /api/generate-card, /api/journal, /api/process-media
+**Auth:** /sign-in, /sign-up
+
