@@ -21,22 +21,28 @@ function extractYouTubeId(text: string): string | null {
 }
 
 // Fetch YouTube transcript
-async function fetchYouTubeTranscript(videoId: string): Promise<string | null> {
+async function fetchYouTubeTranscript(videoId: string): Promise<{ text: string | null; error?: string }> {
   try {
     const transcript = await YoutubeTranscript.fetchTranscript(videoId);
-    if (!transcript || transcript.length === 0) return null;
+    if (!transcript || transcript.length === 0) {
+      return { text: null, error: "no_transcript" };
+    }
     
     // Combine all transcript segments
     const fullText = transcript.map(segment => segment.text).join(" ");
     
     // Truncate if too long (keep under ~8k chars for context window)
     if (fullText.length > 8000) {
-      return fullText.slice(0, 8000) + "... [transcript truncated]";
+      return { text: fullText.slice(0, 8000) + "... [transcript truncated]" };
     }
-    return fullText;
-  } catch (error) {
+    return { text: fullText };
+  } catch (error: any) {
     console.error("Failed to fetch YouTube transcript:", error);
-    return null;
+    const errorMsg = error?.message || "";
+    if (errorMsg.includes("disabled") || errorMsg.includes("not available")) {
+      return { text: null, error: "disabled" };
+    }
+    return { text: null, error: "blocked" };
   }
 }
 
@@ -128,14 +134,30 @@ export async function POST(req: NextRequest) {
 
     if (videoId) {
       console.log("Detected YouTube video:", videoId);
-      const transcript = await fetchYouTubeTranscript(videoId);
+      const result = await fetchYouTubeTranscript(videoId);
       
-      if (transcript) {
-        videoContext = `\n\n[VIDEO TRANSCRIPT - The user shared a YouTube video. Here's the transcript for context:]\n${transcript}\n[END TRANSCRIPT]`;
+      if (result.text) {
+        videoContext = `\n\n[VIDEO TRANSCRIPT - The user shared a YouTube video. Here's the transcript for context:]\n${result.text}\n[END TRANSCRIPT]`;
         enrichedMessage = `${message}\n\nI've shared a YouTube video with you. Can you help me understand or discuss it?`;
       } else {
-        // Couldn't fetch transcript - let the AI know
-        videoContext = `\n\n[Note: The user shared a YouTube video (${videoId}) but the transcript couldn't be fetched - it may not have captions available.]`;
+        // Couldn't fetch transcript - provide helpful context
+        let errorExplanation = "";
+        if (result.error === "disabled") {
+          errorExplanation = "This video has captions disabled by the creator.";
+        } else if (result.error === "blocked") {
+          errorExplanation = "YouTube is temporarily blocking transcript requests from our servers.";
+        } else {
+          errorExplanation = "This video doesn't have available captions.";
+        }
+        
+        videoContext = `\n\n[Note: The user shared a YouTube video (ID: ${videoId}) but I couldn't fetch the transcript. ${errorExplanation}
+
+IMPORTANT: Instead of saying you can't access videos, ask the user to:
+1. Share the video title so you can discuss based on that
+2. Copy-paste key quotes or the auto-generated captions from YouTube
+3. Describe the main points they want to discuss
+
+Be helpful and work with what they can provide!]`;
       }
     }
 
