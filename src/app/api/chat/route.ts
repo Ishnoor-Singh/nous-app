@@ -1,48 +1,87 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
-import { YoutubeTranscript } from "youtube-transcript";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Extract YouTube video ID from various URL formats
-function extractYouTubeId(text: string): string | null {
+// Supadata API key for video transcripts
+const SUPADATA_API_KEY = process.env.SUPADATA_API_KEY || "sd_f05cfbfebf323d56da8a9b1b2ea92869";
+
+// Extract video URL from text (YouTube, TikTok, Instagram, X, Facebook)
+function extractVideoUrl(text: string): string | null {
   const patterns = [
-    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
-    /^([a-zA-Z0-9_-]{11})$/, // Just the ID
+    // YouTube
+    /(https?:\/\/(?:www\.)?youtube\.com\/watch\?v=[a-zA-Z0-9_-]+[^\s]*)/,
+    /(https?:\/\/youtu\.be\/[a-zA-Z0-9_-]+[^\s]*)/,
+    // TikTok
+    /(https?:\/\/(?:www\.)?tiktok\.com\/@[^\s]+\/video\/\d+[^\s]*)/,
+    // Instagram
+    /(https?:\/\/(?:www\.)?instagram\.com\/(?:reel|p)\/[^\s]+)/,
+    // X/Twitter
+    /(https?:\/\/(?:www\.)?(?:twitter\.com|x\.com)\/[^\s]+\/status\/\d+[^\s]*)/,
+    // Facebook
+    /(https?:\/\/(?:www\.)?facebook\.com\/[^\s]+)/,
   ];
   
   for (const pattern of patterns) {
     const match = text.match(pattern);
-    if (match) return match[1];
+    if (match) return match[1].split(/[\s\])]/, 1)[0]; // Clean trailing chars
   }
   return null;
 }
 
-// Fetch YouTube transcript
-async function fetchYouTubeTranscript(videoId: string): Promise<{ text: string | null; error?: string }> {
+// Fetch transcript using Supadata API
+async function fetchVideoTranscript(videoUrl: string): Promise<{ text: string | null; error?: string }> {
   try {
-    const transcript = await YoutubeTranscript.fetchTranscript(videoId);
-    if (!transcript || transcript.length === 0) {
+    const encodedUrl = encodeURIComponent(videoUrl);
+    const response = await fetch(
+      `https://api.supadata.ai/v1/transcript?url=${encodedUrl}&text=true&mode=auto`,
+      {
+        headers: { "x-api-key": SUPADATA_API_KEY },
+      }
+    );
+
+    // Handle async job (long videos)
+    if (response.status === 202) {
+      const { jobId } = await response.json();
+      // Poll for results (max 30 seconds in serverless)
+      for (let i = 0; i < 30; i++) {
+        await new Promise(r => setTimeout(r, 1000));
+        const jobResponse = await fetch(`https://api.supadata.ai/v1/job/${jobId}`, {
+          headers: { "x-api-key": SUPADATA_API_KEY },
+        });
+        const jobData = await jobResponse.json();
+        if (jobData.status === "completed") {
+          const text = jobData.content;
+          return { text: text.length > 12000 ? text.slice(0, 12000) + "... [truncated]" : text };
+        }
+        if (jobData.status === "failed") {
+          return { text: null, error: "transcription_failed" };
+        }
+      }
+      return { text: null, error: "timeout" };
+    }
+
+    if (response.status === 206) {
       return { text: null, error: "no_transcript" };
     }
-    
-    // Combine all transcript segments
-    const fullText = transcript.map(segment => segment.text).join(" ");
-    
-    // Truncate if too long (keep under ~8k chars for context window)
-    if (fullText.length > 8000) {
-      return { text: fullText.slice(0, 8000) + "... [transcript truncated]" };
+
+    if (!response.ok) {
+      return { text: null, error: `api_error_${response.status}` };
     }
-    return { text: fullText };
+
+    const data = await response.json();
+    const text = data.content;
+    
+    // Truncate if too long
+    if (text.length > 12000) {
+      return { text: text.slice(0, 12000) + "... [transcript truncated]" };
+    }
+    return { text };
   } catch (error: any) {
-    console.error("Failed to fetch YouTube transcript:", error);
-    const errorMsg = error?.message || "";
-    if (errorMsg.includes("disabled") || errorMsg.includes("not available")) {
-      return { text: null, error: "disabled" };
-    }
-    return { text: null, error: "blocked" };
+    console.error("Failed to fetch video transcript:", error);
+    return { text: null, error: "fetch_failed" };
   }
 }
 
@@ -127,34 +166,40 @@ export async function POST(req: NextRequest) {
   try {
     const { message, conversationId, userId, emotionalState, messages } = await req.json();
 
-    // Check for YouTube URL in the message
-    const videoId = extractYouTubeId(message);
+    // Check for video URL in the message (YouTube, TikTok, Instagram, X, Facebook)
+    const videoUrl = extractVideoUrl(message);
     let enrichedMessage = message;
     let videoContext = "";
 
-    if (videoId) {
-      console.log("Detected YouTube video:", videoId);
-      const result = await fetchYouTubeTranscript(videoId);
+    if (videoUrl) {
+      console.log("Detected video URL:", videoUrl);
+      const result = await fetchVideoTranscript(videoUrl);
       
       if (result.text) {
-        videoContext = `\n\n[VIDEO TRANSCRIPT - The user shared a YouTube video. Here's the transcript for context:]\n${result.text}\n[END TRANSCRIPT]`;
-        enrichedMessage = `${message}\n\nI've shared a YouTube video with you. Can you help me understand or discuss it?`;
+        const platform = videoUrl.includes("youtube") || videoUrl.includes("youtu.be") ? "YouTube" :
+                        videoUrl.includes("tiktok") ? "TikTok" :
+                        videoUrl.includes("instagram") ? "Instagram" :
+                        videoUrl.includes("twitter") || videoUrl.includes("x.com") ? "X (Twitter)" :
+                        videoUrl.includes("facebook") ? "Facebook" : "video";
+        
+        videoContext = `\n\n[VIDEO TRANSCRIPT - The user shared a ${platform} video. Here's the transcript for context:]\n${result.text}\n[END TRANSCRIPT]`;
+        enrichedMessage = `${message}\n\nI've shared a video with you. Can you help me understand or discuss it?`;
       } else {
         // Couldn't fetch transcript - provide helpful context
         let errorExplanation = "";
-        if (result.error === "disabled") {
-          errorExplanation = "This video has captions disabled by the creator.";
-        } else if (result.error === "blocked") {
-          errorExplanation = "YouTube is temporarily blocking transcript requests from our servers.";
-        } else {
+        if (result.error === "no_transcript") {
           errorExplanation = "This video doesn't have available captions.";
+        } else if (result.error === "timeout") {
+          errorExplanation = "The video is very long and transcription timed out.";
+        } else {
+          errorExplanation = "Couldn't access the video transcript.";
         }
         
-        videoContext = `\n\n[Note: The user shared a YouTube video (ID: ${videoId}) but I couldn't fetch the transcript. ${errorExplanation}
+        videoContext = `\n\n[Note: The user shared a video but I couldn't fetch the transcript. ${errorExplanation}
 
 IMPORTANT: Instead of saying you can't access videos, ask the user to:
 1. Share the video title so you can discuss based on that
-2. Copy-paste key quotes or the auto-generated captions from YouTube
+2. Copy-paste key quotes or the auto-generated captions
 3. Describe the main points they want to discuss
 
 Be helpful and work with what they can provide!]`;
@@ -187,7 +232,7 @@ Be helpful and work with what they can provide!]`;
     return NextResponse.json({
       response: assistantMessage,
       emotion: emotionAnalysis,
-      videoProcessed: !!videoId,
+      videoProcessed: !!videoUrl,
     });
   } catch (error) {
     console.error("Chat API error:", error);
