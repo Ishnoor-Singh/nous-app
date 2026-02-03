@@ -128,4 +128,95 @@ export default defineSchema({
     createdAt: v.number(),
     appliedAt: v.optional(v.number()),
   }).index("by_user", ["userId"]),
+
+  // Habits - customizable daily habits (75 Hard style)
+  habits: defineTable({
+    userId: v.id("users"),
+    name: v.string(),
+    description: v.optional(v.string()),
+    icon: v.optional(v.string()), // emoji
+    category: v.union(
+      v.literal("fitness"),
+      v.literal("nutrition"),
+      v.literal("mindfulness"),
+      v.literal("learning"),
+      v.literal("productivity"),
+      v.literal("health"),
+      v.literal("custom"),
+    ),
+    // Tracking config
+    trackingType: v.union(
+      v.literal("boolean"), // did/didn't
+      v.literal("count"), // e.g., glasses of water
+      v.literal("duration"), // minutes
+    ),
+    targetValue: v.optional(v.number()), // e.g., 8 glasses, 45 minutes
+    targetUnit: v.optional(v.string()), // e.g., "glasses", "minutes"
+    // Schedule
+    frequency: v.union(
+      v.literal("daily"),
+      v.literal("weekdays"),
+      v.literal("custom"),
+    ),
+    activeDays: v.optional(v.array(v.number())), // 0-6 for custom
+    // State
+    isActive: v.boolean(),
+    createdAt: v.number(),
+  }).index("by_user", ["userId"]),
+
+  // Daily habit completions
+  habitLogs: defineTable({
+    userId: v.id("users"),
+    habitId: v.id("habits"),
+    date: v.string(), // YYYY-MM-DD
+    completed: v.boolean(),
+    value: v.optional(v.number()), // for count/duration types
+    notes: v.optional(v.string()),
+    completedAt: v.optional(v.number()),
+  })
+    .index("by_habit_date", ["habitId", "date"])
+    .index("by_user_date", ["userId", "date"]),
+
+  // Todos with Nous accountability
+  todos: defineTable({
+    userId: v.id("users"),
+    title: v.string(),
+    description: v.optional(v.string()),
+    priority: v.union(
+      v.literal("high"),
+      v.literal("medium"),
+      v.literal("low"),
+    ),
+    dueDate: v.optional(v.string()), // YYYY-MM-DD
+    dueTime: v.optional(v.string()), // HH:MM
+    completed: v.boolean(),
+    completedAt: v.optional(v.number()),
+    // Nous accountability
+    nousReminder: v.optional(v.boolean()), // should Nous check in about this?
+    reminderSent: v.optional(v.boolean()),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_due", ["userId", "dueDate"]),
+
+  // Daily check-in summaries
+  dailyCheckIns: defineTable({
+    userId: v.id("users"),
+    date: v.string(), // YYYY-MM-DD
+    // Mood tracking
+    morningMood: v.optional(v.number()), // 1-5
+    eveningMood: v.optional(v.number()),
+    // Quick reflections
+    gratitude: v.optional(v.string()),
+    intention: v.optional(v.string()),
+    reflection: v.optional(v.string()),
+    // Aggregate stats for the day
+    habitsCompleted: v.number(),
+    habitsTotal: v.number(),
+    todosCompleted: v.number(),
+    // Nous's summary/encouragement
+    nousSummary: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_user_date", ["userId", "date"]),
 });

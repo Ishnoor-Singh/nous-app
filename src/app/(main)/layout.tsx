@@ -4,7 +4,7 @@ import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { motion } from "framer-motion";
-import { Home, MessageCircle, Brain, User } from "lucide-react";
+import { Home, MessageCircle, Brain, User, Target } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -40,7 +40,7 @@ export default function MainLayout({
         <div className="flex items-center justify-around py-3 max-w-lg mx-auto">
           <NavItem href="/home" icon={Home} label="Home" active={pathname === "/home"} />
           <NavItem href="/chat" icon={MessageCircle} label="Chat" active={pathname === "/chat"} />
-          <NavItem href="/insights" icon={Brain} label="Insights" active={pathname === "/insights"} />
+          <NavItem href="/habits" icon={Target} label="Habits" active={pathname === "/habits"} />
           <NavItem href="/profile" icon={User} label="Profile" active={pathname === "/profile"} />
         </div>
       </nav>

@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   Brain, Flame, BookOpen, MessageCircle, 
   Sparkles, ChevronRight, Palette, Scale, 
-  Clock, Globe, Heart
+  Clock, Globe, Heart, Target, Check
 } from "lucide-react";
 import Link from "next/link";
 
@@ -33,6 +33,11 @@ export default function HomePage() {
   const todayCards = useQuery(api.knowledge.getTodayCards, {
     userId: userData?.user?._id || ("" as any),
   });
+  // TODO: Enable after running `npx convex dev` to push schema
+  // const habitProgress = useQuery(api.habits.getTodayProgress, {
+  //   userId: userData?.user?._id || ("" as any),
+  // });
+  const habitProgress = null as { _id: string; icon?: string; isCompletedToday: boolean }[] | null; // Temporary until schema pushed
   const generateCards = useMutation(api.knowledge.generateDailyCards);
   const syncUser = useMutation(api.users.syncUser);
 
@@ -129,6 +134,61 @@ export default function HomePage() {
             </p>
           </div>
         </motion.div>
+      )}
+
+      {/* Today's Habits */}
+      {habitProgress && habitProgress.length > 0 && (
+        <motion.section
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.1 }}
+          className="mb-8"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <Target className="w-5 h-5 text-accent" />
+              Today's Habits
+            </h2>
+            <Link href="/habits" className="text-sm text-accent">
+              See all
+            </Link>
+          </div>
+          
+          <div className="grid grid-cols-4 gap-2">
+            {habitProgress.slice(0, 4).map((habit) => (
+              <div
+                key={habit._id}
+                className={`p-3 rounded-xl text-center transition-all ${
+                  habit.isCompletedToday
+                    ? "bg-accent/20 ring-2 ring-accent"
+                    : "bg-muted"
+                }`}
+              >
+                <span className="text-2xl">{habit.icon || "✨"}</span>
+                {habit.isCompletedToday && (
+                  <div className="flex justify-center mt-1">
+                    <Check className="w-4 h-4 text-accent" />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          
+          {/* Progress bar */}
+          <div className="mt-3 h-2 bg-secondary rounded-full overflow-hidden">
+            <motion.div
+              className="h-full bg-accent"
+              initial={{ width: 0 }}
+              animate={{ 
+                width: `${(habitProgress.filter(h => h.isCompletedToday).length / habitProgress.length) * 100}%` 
+              }}
+              transition={{ delay: 0.3, duration: 0.5 }}
+            />
+          </div>
+          <p className="text-sm text-muted-foreground mt-2 text-center">
+            {habitProgress.filter(h => h.isCompletedToday).length} of {habitProgress.length} completed
+          </p>
+        </motion.section>
       )}
 
       {/* Today's Discoveries */}
