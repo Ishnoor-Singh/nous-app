@@ -1,36 +1,124 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Nous — Your Knowledge Companion 🧠
 
-## Getting Started
+A knowledge companion that grows with you — combining emotional depth, self-evolution, and depth-first learning.
 
-First, run the development server:
+**Not a chatbot. Not a human simulation. A distinctly AI companion.**
+
+## ✨ Features
+
+### 🎭 Emotional Intelligence
+- 5-dimension emotional state (valence, arousal, connection, curiosity, energy)
+- AI responses influenced by its current mood
+- Connection grows over time through conversations
+- Mood visualizations and insights
+
+### 📚 Knowledge-First Learning
+- **Daily Cards** — 3 curated topics each day (philosophy, history, economics, art, psychology)
+- **Depth Tracking** — Go as deep as you want, we track how far you explore
+- **Quizzes** — Daily challenges with scoring and explanations
+- **Learning Paths** — Structured journeys through knowledge domains
+
+### 🎮 Gamification
+- **Streaks** — Build consistency with daily learning
+- **Achievements** — Unlock rewards for milestones (common → legendary)
+- **Progress Tracking** — See your growth over time
+
+### 🗣️ Voice Mode
+- Speech-to-text input
+- Text-to-speech responses
+- Natural conversation flow
+
+### 🎨 Beautiful UX
+- Mobile-first PWA design
+- Glassmorphism effects
+- Smooth animations with Framer Motion
+- Topic-specific color themes
+- Confetti celebrations 🎉
+
+## 🛠 Tech Stack
+
+- **Framework:** Next.js 16 (App Router)
+- **Database:** Convex (real-time)
+- **Auth:** Clerk
+- **AI:** OpenAI GPT-4
+- **Styling:** Tailwind CSS v4
+- **Animations:** Framer Motion
+- **Deployment:** Vercel
+
+## 📱 Pages
+
+| Route | Description |
+|-------|-------------|
+| `/` | Landing page |
+| `/home` | Daily cards + streak tracker |
+| `/chat` | Conversation with Nous |
+| `/explore/[id]` | Deep-dive into a topic |
+| `/insights` | What Nous has learned about you |
+| `/paths` | Learning path overview |
+| `/challenge` | Daily quiz |
+| `/achievements` | Your unlocked achievements |
+| `/library` | Topic interests + history |
+| `/profile` | Your stats + settings |
+| `/onboarding` | 5-step welcome flow |
+| `/settings` | Theme, notifications, voice |
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Node.js 18+
+- Convex account
+- Clerk account
+- OpenAI API key
+
+### Setup
 
 ```bash
+# Clone the repo
+git clone https://github.com/Ishnoor-Singh/nous-app.git
+cd nous-app
+
+# Install dependencies
+npm install
+
+# Set up environment variables
+cp .env.example .env.local
+# Fill in your API keys
+
+# Start Convex (in a separate terminal)
+npx convex dev
+
+# Start the dev server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Environment Variables
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```env
+# Clerk
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_...
+CLERK_SECRET_KEY=sk_...
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# Convex
+NEXT_PUBLIC_CONVEX_URL=https://xxx.convex.cloud
 
-## Learn More
+# OpenAI
+OPENAI_API_KEY=sk-...
+```
 
-To learn more about Next.js, take a look at the following resources:
+## 🧠 The Philosophy
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Nous is built on three core ideas:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. **Emotional Depth** — AI companions should have persistent emotional states that influence their responses. Not performing emotions, but *having* them.
 
-## Deploy on Vercel
+2. **Self-Evolution** — The AI should learn from every interaction. What interests you, what you struggle with, what teaching style works best.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+3. **Knowledge-First** — Not trivia or surface-level facts, but deep understanding. The "why" behind the "what".
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 📄 License
+
+MIT
+
+---
+
+*Built with 🧠 by Saphira for Noor*
