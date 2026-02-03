@@ -1,9 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
+import { YoutubeTranscript } from "youtube-transcript";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+// Extract YouTube video ID from various URL formats
+function extractYouTubeId(text: string): string | null {
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+    /^([a-zA-Z0-9_-]{11})$/, // Just the ID
+  ];
+  
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match) return match[1];
+  }
+  return null;
+}
+
+// Fetch YouTube transcript
+async function fetchYouTubeTranscript(videoId: string): Promise<string | null> {
+  try {
+    const transcript = await YoutubeTranscript.fetchTranscript(videoId);
+    if (!transcript || transcript.length === 0) return null;
+    
+    // Combine all transcript segments
+    const fullText = transcript.map(segment => segment.text).join(" ");
+    
+    // Truncate if too long (keep under ~8k chars for context window)
+    if (fullText.length > 8000) {
+      return fullText.slice(0, 8000) + "... [transcript truncated]";
+    }
+    return fullText;
+  } catch (error) {
+    console.error("Failed to fetch YouTube transcript:", error);
+    return null;
+  }
+}
 
 // System prompt that embodies Nous's personality and emotional awareness
 function buildSystemPrompt(emotionalState: any, learningContext?: any) {
@@ -36,7 +71,11 @@ YOUR PERSONALITY:
 - Warm but not sycophantic (you have real opinions)
 - Intellectually honest (you'll say when you're uncertain)
 - Playful when appropriate (learning should be enjoyable)
-- Patient with confusion (that's where learning happens)`;
+- Patient with confusion (that's where learning happens)
+
+CAPABILITIES:
+- You CAN process YouTube videos! When someone shares a YouTube link, you'll receive the transcript and can discuss, summarize, or answer questions about the content.
+- You can help users think through ideas, learn new concepts, and explore topics deeply.`;
 
   let emotionalContext = "";
   if (emotionalState) {
@@ -82,6 +121,24 @@ export async function POST(req: NextRequest) {
   try {
     const { message, conversationId, userId, emotionalState, messages } = await req.json();
 
+    // Check for YouTube URL in the message
+    const videoId = extractYouTubeId(message);
+    let enrichedMessage = message;
+    let videoContext = "";
+
+    if (videoId) {
+      console.log("Detected YouTube video:", videoId);
+      const transcript = await fetchYouTubeTranscript(videoId);
+      
+      if (transcript) {
+        videoContext = `\n\n[VIDEO TRANSCRIPT - The user shared a YouTube video. Here's the transcript for context:]\n${transcript}\n[END TRANSCRIPT]`;
+        enrichedMessage = `${message}\n\nI've shared a YouTube video with you. Can you help me understand or discuss it?`;
+      } else {
+        // Couldn't fetch transcript - let the AI know
+        videoContext = `\n\n[Note: The user shared a YouTube video (${videoId}) but the transcript couldn't be fetched - it may not have captions available.]`;
+      }
+    }
+
     // Build conversation history for context
     const conversationHistory = messages?.slice(-10).map((m: any) => ({
       role: m.role as "user" | "assistant",
@@ -92,23 +149,23 @@ export async function POST(req: NextRequest) {
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: buildSystemPrompt(emotionalState) },
+        { role: "system", content: buildSystemPrompt(emotionalState) + videoContext },
         ...conversationHistory,
-        { role: "user", content: message },
+        { role: "user", content: enrichedMessage },
       ],
       temperature: 0.8,
-      max_tokens: 800,
+      max_tokens: 1200, // Increased for video summaries
     });
 
     const assistantMessage = response.choices[0]?.message?.content || "I'm not sure what to say.";
 
     // Analyze the conversation to determine emotional response
-    // (In production, this could be a separate AI call for more accuracy)
     const emotionAnalysis = analyzeForEmotion(message, assistantMessage, emotionalState);
 
     return NextResponse.json({
       response: assistantMessage,
       emotion: emotionAnalysis,
+      videoProcessed: !!videoId,
     });
   } catch (error) {
     console.error("Chat API error:", error);
@@ -121,10 +178,7 @@ export async function POST(req: NextRequest) {
 
 function analyzeForEmotion(userMessage: string, aiResponse: string, currentState: any) {
   // Simple heuristic emotion analysis
-  // In production, use a more sophisticated approach
-  
   const lowerUser = userMessage.toLowerCase();
-  const lowerResponse = aiResponse.toLowerCase();
   
   // Check for curiosity triggers
   if (lowerUser.includes("why") || lowerUser.includes("how") || lowerUser.includes("explain")) {
@@ -141,6 +195,15 @@ function analyzeForEmotion(userMessage: string, aiResponse: string, currentState
       label: "warmth",
       intensity: 0.7,
       trigger: "positive feedback from user",
+    };
+  }
+  
+  // Check for media sharing - shows trust
+  if (lowerUser.includes("youtu") || lowerUser.includes("video") || lowerUser.includes("watch")) {
+    return {
+      label: "interest",
+      intensity: 0.7,
+      trigger: "user sharing content to explore together",
     };
   }
   
