@@ -1,0 +1,238 @@
+/* Paper Theme - Skeuomorphic Notebook Aesthetic */
+
+@import url('https://fonts.googleapis.com/css2?family=Architects+Daughter&family=Caveat:wght@400;600&family=Permanent+Marker&family=Indie+Flower&family=Patrick+Hand&display=swap');
+
+:root {
+  --paper-cream: #fefcf6;
+  --paper-aged: #f5f0e6;
+  --paper-kraft: #d4c4a8;
+  --paper-yellow: #fff9c4;
+  --paper-pink: #ffcccb;
+  --paper-blue: #bbdefb;
+  --paper-green: #c8e6c9;
+  
+  --ink-dark: #2c2c2c;
+  --ink-light: #666;
+  --ink-red: #c0392b;
+  --ink-green: #2d5016;
+  --ink-blue: #2980b9;
+  
+  --pencil-gray: #4a4a4a;
+  --highlighter-yellow: rgba(255, 217, 61, 0.4);
+  --highlighter-pink: rgba(255, 182, 193, 0.4);
+  --highlighter-green: rgba(144, 238, 144, 0.4);
+  
+  --tape-cream: rgba(255, 248, 220, 0.7);
+  --tape-blue: rgba(173, 216, 230, 0.5);
+  --tape-peach: rgba(255, 218, 185, 0.6);
+  
+  --shadow-paper: 3px 4px 12px rgba(0,0,0,0.15);
+  --shadow-sticky: 2px 3px 8px rgba(0,0,0,0.15);
+}
+
+/* Paper textures */
+.paper-lined {
+  background-color: var(--paper-cream);
+  background-image: repeating-linear-gradient(
+    transparent, 
+    transparent 27px, 
+    #e8dcd0 28px
+  );
+  background-size: 100% 28px;
+}
+
+.paper-graph {
+  background-color: #f8f8f8;
+  background-image: 
+    linear-gradient(#d4c4b0 1px, transparent 1px),
+    linear-gradient(90deg, #d4c4b0 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.paper-kraft {
+  background-color: var(--paper-kraft);
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23n)' opacity='0.15'/%3E%3C/svg%3E");
+}
+
+.paper-noise {
+  background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.08'/%3E%3C/svg%3E");
+}
+
+/* Typography */
+.font-marker {
+  font-family: 'Permanent Marker', cursive;
+}
+
+.font-handwriting {
+  font-family: 'Architects Daughter', cursive;
+}
+
+.font-cursive {
+  font-family: 'Caveat', cursive;
+}
+
+.font-indie {
+  font-family: 'Indie Flower', cursive;
+}
+
+.font-patrick {
+  font-family: 'Patrick Hand', cursive;
+}
+
+/* Pencil/hand-drawn filter */
+.pencil-stroke {
+  filter: url(#pencil-filter);
+}
+
+/* Tape strip */
+.tape {
+  height: 20px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.tape-cream { background: var(--tape-cream); }
+.tape-blue { background: var(--tape-blue); }
+.tape-peach { background: var(--tape-peach); }
+
+/* Sticky note */
+.sticky-note {
+  box-shadow: var(--shadow-sticky), inset 0 -40px 40px rgba(0,0,0,0.02);
+  font-family: 'Caveat', cursive;
+}
+
+.sticky-yellow { background: var(--paper-yellow); }
+.sticky-pink { background: var(--paper-pink); }
+.sticky-blue { background: var(--paper-blue); }
+.sticky-green { background: var(--paper-green); }
+
+/* Coffee stain */
+.coffee-stain {
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 40%,
+    rgba(139, 90, 43, 0.08) 50%,
+    rgba(139, 90, 43, 0.12) 60%,
+    rgba(139, 90, 43, 0.05) 70%,
+    transparent 80%
+  );
+  pointer-events: none;
+}
+
+/* Paper clip */
+.paper-clip {
+  width: 20px;
+  height: 50px;
+  border-radius: 10px 10px 0 0;
+  border: 3px solid #b8b8b8;
+  border-bottom: none;
+}
+
+/* Torn paper edge */
+.torn-edge {
+  clip-path: polygon(
+    0% 0%, 
+    2% 1%, 4% 0%, 6% 2%, 8% 0%, 10% 1%,
+    12% 0%, 14% 2%, 16% 0%, 18% 1%, 20% 0%,
+    22% 2%, 24% 0%, 26% 1%, 28% 0%, 30% 2%,
+    32% 0%, 34% 1%, 36% 0%, 38% 2%, 40% 0%,
+    42% 1%, 44% 0%, 46% 2%, 48% 0%, 50% 1%,
+    52% 0%, 54% 2%, 56% 0%, 58% 1%, 60% 0%,
+    62% 2%, 64% 0%, 66% 1%, 68% 0%, 70% 2%,
+    72% 0%, 74% 1%, 76% 0%, 78% 2%, 80% 0%,
+    82% 1%, 84% 0%, 86% 2%, 88% 0%, 90% 1%,
+    92% 0%, 94% 2%, 96% 0%, 98% 1%, 100% 0%,
+    100% 100%, 0% 100%
+  );
+}
+
+/* Red margin line */
+.margin-line {
+  position: relative;
+}
+
+.margin-line::before {
+  content: '';
+  position: absolute;
+  left: 50px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--paper-pink);
+}
+
+/* Highlighter effect */
+.highlighted {
+  background: linear-gradient(
+    180deg,
+    transparent 60%,
+    var(--highlighter-yellow) 60%,
+    var(--highlighter-yellow) 90%,
+    transparent 90%
+  );
+}
+
+.highlighted-pink {
+  background: linear-gradient(
+    180deg,
+    transparent 60%,
+    var(--highlighter-pink) 60%,
+    var(--highlighter-pink) 90%,
+    transparent 90%
+  );
+}
+
+/* Strikethrough with pencil */
+.crossed-out {
+  text-decoration: line-through;
+  text-decoration-color: var(--pencil-gray);
+  text-decoration-thickness: 2px;
+  color: var(--ink-light);
+}
+
+/* Washi tape patterns */
+.washi-dots {
+  background-image: radial-gradient(circle, #fff 20%, transparent 20%);
+  background-size: 8px 8px;
+}
+
+.washi-stripes {
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 3px,
+    rgba(255,255,255,0.3) 3px,
+    rgba(255,255,255,0.3) 6px
+  );
+}
+
+/* Animations */
+@keyframes pencil-write {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(1px) rotate(0.5deg); }
+  75% { transform: translateX(-1px) rotate(-0.5deg); }
+}
+
+.writing {
+  animation: pencil-write 0.1s ease-in-out infinite;
+}
+
+/* Checkbox - pencil style */
+.pencil-checkbox {
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--pencil-gray);
+  border-radius: 2px;
+  cursor: pointer;
+  position: relative;
+}
+
+.pencil-checkbox.checked::after {
+  content: '✓';
+  position: absolute;
+  top: -4px;
+  left: 2px;
+  font-size: 24px;
+  color: var(--ink-green);
+  font-family: 'Permanent Marker', cursive;
+}
