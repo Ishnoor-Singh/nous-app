@@ -4,9 +4,9 @@ import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { useState, useRef, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Send, Brain, Sparkles, Loader2 } from "lucide-react";
+import { Send, Loader2 } from "lucide-react";
 import { Id } from "../../../../convex/_generated/dataModel";
+import { TapeStrip, Doodle, PaperCard } from "@/components/paper/PaperElements";
 
 export default function ChatPage() {
   const { user } = useUser();
@@ -20,12 +20,10 @@ export default function ChatPage() {
   );
   const createConversation = useMutation(api.conversations.create);
   const addMessage = useMutation(api.conversations.addMessage);
-  const logEmotion = useMutation(api.emotions.logEmotion);
 
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -43,21 +41,18 @@ export default function ChatPage() {
     setIsLoading(true);
 
     try {
-      // Create conversation if needed
       let convId = activeConversationId;
       if (!convId) {
         convId = await createConversation({ userId: userData.user._id });
         setActiveConversationId(convId);
       }
 
-      // Add user message
       await addMessage({
         conversationId: convId,
         role: "user",
         content: messageText,
       });
 
-      // Get AI response
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -72,29 +67,11 @@ export default function ChatPage() {
 
       const data = await response.json();
 
-      // Add AI response
       await addMessage({
         conversationId: convId,
         role: "assistant",
         content: data.response,
-        emotionalContext: userData.emotionalState ? {
-          valence: userData.emotionalState.valence,
-          arousal: userData.emotionalState.arousal,
-          connection: userData.emotionalState.connection,
-          curiosity: userData.emotionalState.curiosity,
-          energy: userData.emotionalState.energy,
-        } : undefined,
       });
-
-      // Log emotional response if provided
-      if (data.emotion) {
-        await logEmotion({
-          userId: userData.user._id,
-          emotion: data.emotion.label,
-          intensity: data.emotion.intensity,
-          trigger: data.emotion.trigger,
-        });
-      }
     } catch (error) {
       console.error("Failed to send message:", error);
     } finally {
@@ -102,122 +79,204 @@ export default function ChatPage() {
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
-
   const messages = conversationData?.messages || [];
 
   return (
-    <main className="min-h-dvh flex flex-col safe-top">
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       {/* Header */}
-      <header className="p-4 border-b border-secondary glass sticky top-0 z-10">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-accent to-purple-600 flex items-center justify-center">
-            <Brain className="w-5 h-5 text-white" />
+      <header 
+        style={{
+          padding: "16px 20px",
+          background: "#f5f0e6",
+          borderBottom: "3px solid #e8dcd0",
+          position: "sticky",
+          top: 0,
+          zIndex: 10,
+        }}
+      >
+        <TapeStrip style={{ position: "absolute", top: -8, right: 30 }} rotation={3} color="blue" />
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div 
+            style={{
+              width: 44,
+              height: 44,
+              background: "#fff9c4",
+              borderRadius: 8,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 24,
+              boxShadow: "2px 2px 6px rgba(0,0,0,0.1)",
+              transform: "rotate(-2deg)",
+            }}
+          >
+            🧠
           </div>
           <div>
-            <h1 className="font-semibold">Nous</h1>
-            <p className="text-xs text-muted-foreground">
-              {userData?.emotionalState ? getMoodText(userData.emotionalState) : "Your companion"}
+            <h1 style={{ fontFamily: "'Permanent Marker', cursive", fontSize: 20, color: "#2c2c2c", margin: 0 }}>
+              Nous
+            </h1>
+            <p style={{ fontFamily: "'Caveat', cursive", fontSize: 14, color: "#666", margin: 0 }}>
+              your thinking partner
             </p>
           </div>
         </div>
       </header>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div style={{ flex: 1, overflowY: "auto", padding: "20px 16px" }}>
         {messages.length === 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center py-12"
-          >
-            <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
-              <Sparkles className="w-10 h-10 text-accent" />
+          <div style={{ textAlign: "center", padding: "60px 20px" }}>
+            <div 
+              style={{
+                width: 80,
+                height: 80,
+                background: "#fff9c4",
+                borderRadius: 12,
+                margin: "0 auto 20px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 40,
+                boxShadow: "3px 4px 8px rgba(0,0,0,0.1)",
+                transform: "rotate(3deg)",
+              }}
+            >
+              ✨
             </div>
-            <h2 className="text-xl font-semibold mb-2">Let's explore together</h2>
-            <p className="text-muted-foreground max-w-xs mx-auto">
-              Ask me about philosophy, history, economics, art, or psychology. I'll help you understand deeply.
+            <h2 style={{ fontFamily: "'Permanent Marker', cursive", fontSize: 22, color: "#2c2c2c", marginBottom: 8 }}>
+              Let's explore together
+            </h2>
+            <p style={{ fontFamily: "'Caveat', cursive", fontSize: 18, color: "#666", maxWidth: 280, margin: "0 auto" }}>
+              Ask me about philosophy, history, economics, art, or psychology...
             </p>
-          </motion.div>
+            <Doodle type="arrow" style={{ position: "relative", margin: "20px auto 0", left: 0 }} />
+          </div>
         )}
 
-        <AnimatePresence mode="popLayout">
-          {messages.map((message, index) => (
-            <motion.div
+        {messages.map((message, index) => {
+          const isUser = message.role === "user";
+          const rotation = (Math.random() - 0.5) * 1;
+          
+          return (
+            <div
               key={message._id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ delay: index * 0.05 }}
-              className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+              style={{
+                display: "flex",
+                justifyContent: isUser ? "flex-end" : "flex-start",
+                marginBottom: 16,
+              }}
             >
               <div
-                className={`max-w-[85%] p-4 ${
-                  message.role === "user" ? "message-user" : "message-assistant"
-                }`}
+                style={{
+                  maxWidth: "85%",
+                  padding: "12px 16px",
+                  background: isUser ? "#bbdefb" : "#fefcf6",
+                  borderRadius: isUser ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
+                  boxShadow: "2px 3px 8px rgba(0,0,0,0.1)",
+                  transform: `rotate(${rotation}deg)`,
+                  fontFamily: "'Architects Daughter', cursive",
+                  fontSize: 16,
+                  color: "#2c2c2c",
+                  lineHeight: 1.5,
+                  border: isUser ? "none" : "2px solid #e8dcd0",
+                }}
               >
-                <p className="whitespace-pre-wrap">{message.content}</p>
+                {message.content}
               </div>
-            </motion.div>
-          ))}
-        </AnimatePresence>
+            </div>
+          );
+        })}
 
         {isLoading && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="flex justify-start"
-          >
-            <div className="message-assistant p-4 flex items-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span className="text-muted-foreground">Thinking...</span>
+          <div style={{ display: "flex", justifyContent: "flex-start", marginBottom: 16 }}>
+            <div
+              style={{
+                padding: "12px 20px",
+                background: "#fefcf6",
+                borderRadius: 16,
+                boxShadow: "2px 3px 8px rgba(0,0,0,0.1)",
+                border: "2px solid #e8dcd0",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} />
+              <span style={{ fontFamily: "'Caveat', cursive", color: "#666" }}>thinking...</span>
             </div>
-          </motion.div>
+          </div>
         )}
 
         <div ref={messagesEndRef} />
       </div>
 
       {/* Input */}
-      <div className="p-4 border-t border-secondary glass">
-        <div className="flex items-end gap-2">
-          <div className="flex-1 bg-muted rounded-2xl">
-            <textarea
-              ref={inputRef}
+      <div 
+        style={{
+          padding: "12px 16px 24px",
+          background: "#f5f0e6",
+          borderTop: "3px solid #e8dcd0",
+        }}
+      >
+        <div style={{ display: "flex", gap: 10, maxWidth: 500, margin: "0 auto" }}>
+          <div 
+            style={{
+              flex: 1,
+              background: "#fefcf6",
+              borderRadius: 20,
+              border: "2px solid #e8dcd0",
+              boxShadow: "inset 1px 2px 4px rgba(0,0,0,0.05)",
+            }}
+          >
+            <input
+              type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Ask something..."
-              rows={1}
-              className="w-full p-4 bg-transparent resize-none focus:outline-none max-h-32"
-              style={{ 
-                height: "auto",
-                minHeight: "56px",
+              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
+              placeholder="write something..."
+              style={{
+                width: "100%",
+                padding: "14px 18px",
+                border: "none",
+                background: "transparent",
+                fontFamily: "'Architects Daughter', cursive",
+                fontSize: 16,
+                color: "#2c2c2c",
+                outline: "none",
               }}
             />
           </div>
           <button
             onClick={handleSend}
             disabled={!input.trim() || isLoading}
-            className="w-14 h-14 rounded-2xl bg-accent text-accent-foreground flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-transform"
+            style={{
+              width: 52,
+              height: 52,
+              borderRadius: 16,
+              background: input.trim() ? "#2d5016" : "#ccc",
+              color: "white",
+              border: "none",
+              cursor: input.trim() ? "pointer" : "not-allowed",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxShadow: "2px 3px 6px rgba(0,0,0,0.15)",
+              transform: "rotate(2deg)",
+              transition: "all 0.2s",
+            }}
           >
-            <Send className="w-5 h-5" />
+            <Send size={20} />
           </button>
         </div>
       </div>
-    </main>
-  );
-}
 
-function getMoodText(state: any): string {
-  if (state.curiosity > 0.6) return "Curious to learn more";
-  if (state.connection > 0.6) return "Feeling connected";
-  if (state.valence > 0.3) return "In a good mood";
-  if (state.arousal > 0.6) return "Energized";
-  return "Here for you";
+      <style jsx global>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+    </div>
+  );
 }

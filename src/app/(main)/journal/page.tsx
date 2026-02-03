@@ -4,15 +4,9 @@ import { useUser } from "@clerk/nextjs";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { useState } from "react";
-import { motion } from "framer-motion";
-import { 
-  BookOpen, Sparkles, Calendar, PenLine,
-  ChevronRight, Flame, MessageCircle
-} from "lucide-react";
+import { ChevronRight, Sparkles } from "lucide-react";
 import Link from "next/link";
-
-// Placeholder page until Convex schema is pushed
-// Run `npx convex dev` locally to enable journaling
+import { TapeStrip, StickyNote, CoffeeStain, Doodle, PaperClip, WashiTape } from "@/components/paper/PaperElements";
 
 export default function JournalPage() {
   const { user } = useUser();
@@ -21,165 +15,187 @@ export default function JournalPage() {
   });
 
   const [selectedPrompt, setSelectedPrompt] = useState<string | null>(null);
+  const [entry, setEntry] = useState("");
 
   if (!userData?.user) {
     return (
-      <div className="min-h-dvh flex items-center justify-center">
-        <div className="w-12 h-12 rounded-full border-2 border-accent border-t-transparent animate-spin" />
+      <div style={{ padding: 24, textAlign: "center" }}>
+        <p style={{ fontFamily: "'Caveat', cursive", fontSize: 20, color: "#666" }}>
+          Loading...
+        </p>
       </div>
     );
   }
 
-  // Preview prompts
+  const today = new Date().toLocaleDateString('en-US', { 
+    weekday: 'long', 
+    month: 'short', 
+    day: 'numeric' 
+  });
+
   const prompts = [
     { category: "reflection", text: "What's one thing you learned about yourself today?", icon: "🪞" },
     { category: "gratitude", text: "What are three things you're grateful for right now?", icon: "🙏" },
     { category: "growth", text: "In what small way did you grow today?", icon: "🌱" },
     { category: "intention", text: "What do you want tomorrow to look like?", icon: "🎯" },
+    { category: "emotion", text: "What emotion has been most present today?", icon: "💭" },
   ];
 
-  const today = new Date().toLocaleDateString('en-US', { 
-    weekday: 'long', 
-    month: 'long', 
-    day: 'numeric' 
-  });
-
   return (
-    <main className="min-h-dvh p-6 safe-top safe-bottom">
+    <div style={{ padding: "20px 16px", maxWidth: 500, margin: "0 auto", position: "relative" }}>
       {/* Header */}
-      <motion.header
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        className="mb-6"
+      <div
+        style={{
+          background: "#f5f0e6",
+          padding: "20px 24px",
+          marginBottom: 20,
+          position: "relative",
+          boxShadow: "3px 4px 12px rgba(0,0,0,0.15)",
+        }}
       >
-        <p className="text-muted-foreground text-sm">{today}</p>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <BookOpen className="w-7 h-7 text-accent" />
-          Journal
+        <TapeStrip style={{ top: -8, left: 30 }} rotation={-2} color="peach" />
+        <WashiTape pattern="dots" color="pink" style={{ top: -10, right: 40 }} rotation={3} width={50} />
+        
+        <p style={{ fontFamily: "'Caveat', cursive", fontSize: 14, color: "#666", margin: "0 0 4px 0" }}>
+          {today}
+        </p>
+        <h1 style={{ fontFamily: "'Permanent Marker', cursive", fontSize: 28, color: "#2c2c2c", margin: 0 }}>
+          journal ✍️
         </h1>
-      </motion.header>
 
-      {/* Coming Soon Banner */}
-      <motion.section
-        initial={{ scale: 0.95, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        className="mb-8 p-6 rounded-3xl bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/20"
-      >
-        <div className="flex items-start gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center flex-shrink-0">
-            <PenLine className="w-7 h-7 text-white" />
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold mb-1">AI-Assisted Journaling</h2>
-            <p className="text-sm text-muted-foreground">
-              Nous helps you reflect with thoughtful prompts, tracks themes across your entries, and offers gentle insights.
-            </p>
-          </div>
-        </div>
-      </motion.section>
+        <Doodle type="heart" style={{ bottom: 10, right: 20 }} />
+      </div>
 
-      {/* Writing Prompts */}
-      <section className="mb-8">
-        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-accent" />
-          Today's Prompts
+      {/* Prompts section */}
+      <div style={{ marginBottom: 20 }}>
+        <h2 style={{ fontFamily: "'Architects Daughter', cursive", fontSize: 18, color: "#2c2c2c", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+          <Sparkles size={18} color="#ffd93d" /> writing prompts
         </h2>
         
-        <div className="space-y-3">
-          {prompts.map((prompt, index) => (
-            <motion.button
-              key={prompt.category}
-              initial={{ x: -20, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              transition={{ delay: index * 0.1 }}
-              onClick={() => setSelectedPrompt(prompt.text)}
-              className={`w-full p-4 rounded-2xl text-left transition-all ${
-                selectedPrompt === prompt.text
-                  ? "bg-accent/10 ring-2 ring-accent"
-                  : "bg-muted hover:bg-secondary"
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">{prompt.icon}</span>
-                <p className="flex-1 text-sm">{prompt.text}</p>
-                <ChevronRight className="w-5 h-5 text-muted-foreground" />
-              </div>
-            </motion.button>
-          ))}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {prompts.map((prompt, index) => {
+            const rotation = (index % 2 === 0 ? 1 : -1) * (Math.random() * 2);
+            return (
+              <button
+                key={prompt.category}
+                onClick={() => {
+                  setSelectedPrompt(prompt.text);
+                  setEntry("");
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  padding: "12px 16px",
+                  background: selectedPrompt === prompt.text ? "#fff9c4" : "#f5f0e6",
+                  border: selectedPrompt === prompt.text ? "2px solid #ffd93d" : "2px solid transparent",
+                  borderRadius: 12,
+                  cursor: "pointer",
+                  textAlign: "left",
+                  transform: `rotate(${rotation}deg)`,
+                  boxShadow: "2px 2px 6px rgba(0,0,0,0.08)",
+                  transition: "all 0.2s",
+                }}
+              >
+                <span style={{ fontSize: 24 }}>{prompt.icon}</span>
+                <span style={{ fontFamily: "'Caveat', cursive", fontSize: 16, color: "#2c2c2c", flex: 1 }}>
+                  {prompt.text}
+                </span>
+                <ChevronRight size={18} style={{ color: "#ccc" }} />
+              </button>
+            );
+          })}
         </div>
-      </section>
+      </div>
 
-      {/* Preview Journal Entry */}
-      {selectedPrompt && (
-        <motion.section
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          className="mb-8"
-        >
-          <div className="p-4 rounded-2xl bg-muted">
-            <p className="text-sm text-muted-foreground mb-3">{selectedPrompt}</p>
+      {/* Writing area - lined paper */}
+      <div
+        style={{
+          background: "#fefcf6",
+          backgroundImage: "repeating-linear-gradient(transparent, transparent 27px, #e8dcd0 28px)",
+          backgroundSize: "100% 28px",
+          padding: "20px 20px 20px 56px",
+          position: "relative",
+          minHeight: 250,
+          boxShadow: "4px 5px 15px rgba(0,0,0,0.2)",
+          borderLeft: "3px solid #e8b4b4",
+        }}
+      >
+        {/* Red margin line */}
+        <div style={{ position: "absolute", left: 46, top: 0, bottom: 0, width: 2, background: "#ffcccb" }} />
+        
+        <CoffeeStain style={{ bottom: 30, right: 15, opacity: 0.4 }} />
+        <PaperClip style={{ top: -12, right: 25 }} />
+
+        {selectedPrompt ? (
+          <>
+            <p style={{ fontFamily: "'Caveat', cursive", fontSize: 14, color: "#888", marginBottom: 12, fontStyle: "italic" }}>
+              {selectedPrompt}
+            </p>
             <textarea
-              placeholder="Start writing..."
-              className="w-full h-32 bg-transparent resize-none focus:outline-none text-foreground"
-              disabled
+              value={entry}
+              onChange={(e) => setEntry(e.target.value)}
+              placeholder="start writing..."
+              autoFocus
+              style={{
+                width: "100%",
+                minHeight: 180,
+                border: "none",
+                background: "transparent",
+                fontFamily: "'Architects Daughter', cursive",
+                fontSize: 18,
+                color: "#2c2c2c",
+                lineHeight: "28px",
+                resize: "none",
+                outline: "none",
+              }}
             />
-            <p className="text-xs text-muted-foreground text-center mt-2">
-              Coming soon — journal entries will be saved and analyzed by Nous
+            <p style={{ fontFamily: "'Caveat', cursive", fontSize: 12, color: "#aaa", marginTop: 8 }}>
+              {entry.split(/\s+/).filter(Boolean).length} words
+            </p>
+          </>
+        ) : (
+          <div style={{ textAlign: "center", padding: "40px 0" }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>📝</div>
+            <p style={{ fontFamily: "'Caveat', cursive", fontSize: 18, color: "#666" }}>
+              pick a prompt above to start writing...
             </p>
           </div>
-        </motion.section>
-      )}
+        )}
 
-      {/* Features Preview */}
-      <section className="mb-8">
-        <h2 className="text-lg font-semibold mb-4">What's Coming</h2>
-        <div className="grid grid-cols-2 gap-3">
-          <FeatureCard 
-            icon={<MessageCircle className="w-6 h-6 text-purple-500" />}
-            title="AI Reflections"
-            desc="Nous responds thoughtfully"
-          />
-          <FeatureCard 
-            icon={<Calendar className="w-6 h-6 text-blue-500" />}
-            title="Daily Streaks"
-            desc="Build the habit"
-          />
-          <FeatureCard 
-            icon={<Sparkles className="w-6 h-6 text-amber-500" />}
-            title="Theme Tracking"
-            desc="Patterns over time"
-          />
-          <FeatureCard 
-            icon={<Flame className="w-6 h-6 text-orange-500" />}
-            title="Mood Insights"
-            desc="Emotional awareness"
-          />
-        </div>
-      </section>
+        <Doodle type="underline" style={{ bottom: 20, left: 10 }} />
+      </div>
 
-      {/* Chat CTA */}
-      <Link href="/chat">
-        <motion.div
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          className="p-5 rounded-2xl bg-gradient-to-r from-accent to-purple-600 text-white"
+      {/* Coming soon note */}
+      <div style={{ position: "absolute", right: -10, top: 120 }}>
+        <StickyNote color="green" rotation={-6}>
+          <div style={{ fontSize: 13 }}>
+            AI reflections<br/>coming soon! 🧠
+          </div>
+        </StickyNote>
+      </div>
+
+      {/* Chat alternative */}
+      <Link href="/chat" style={{ textDecoration: "none" }}>
+        <div
+          style={{
+            marginTop: 20,
+            padding: "16px 20px",
+            background: "#f5f0e6",
+            borderRadius: 12,
+            boxShadow: "2px 3px 8px rgba(0,0,0,0.1)",
+            transform: "rotate(-0.5deg)",
+          }}
         >
-          <p className="font-semibold mb-1">Talk to Nous instead</p>
-          <p className="text-sm opacity-80">
-            Not ready to write? Have a conversation and process your thoughts that way.
+          <WashiTape pattern="stripes" color="mint" style={{ top: -10, left: 20 }} rotation={-3} width={50} />
+          <p style={{ fontFamily: "'Permanent Marker', cursive", fontSize: 14, color: "#2c2c2c", margin: 0 }}>
+            💬 prefer to talk?
           </p>
-        </motion.div>
+          <p style={{ fontFamily: "'Caveat', cursive", fontSize: 14, color: "#666", margin: "4px 0 0 0" }}>
+            chat with nous instead →
+          </p>
+        </div>
       </Link>
-    </main>
-  );
-}
-
-function FeatureCard({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
-  return (
-    <div className="p-4 rounded-2xl bg-muted">
-      <div className="mb-2">{icon}</div>
-      <p className="font-semibold text-sm">{title}</p>
-      <p className="text-xs text-muted-foreground">{desc}</p>
     </div>
   );
 }

@@ -3,14 +3,9 @@
 import { useUser, SignOutButton } from "@clerk/nextjs";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
-import { motion } from "framer-motion";
-import { 
-  User, Flame, Brain, Settings, 
-  LogOut, Trophy, BookOpen, Map,
-  Swords, ChevronRight, PenLine, Inbox
-} from "lucide-react";
-import Image from "next/image";
+import { LogOut, Settings, BookOpen, Trophy, Inbox, ChevronRight, Flame } from "lucide-react";
 import Link from "next/link";
+import { TapeStrip, StickyNote, CoffeeStain, Doodle, PaperClip } from "@/components/paper/PaperElements";
 
 export default function ProfilePage() {
   const { user } = useUser();
@@ -20,171 +15,197 @@ export default function ProfilePage() {
   const stats = useQuery(api.knowledge.getStats, {
     userId: userData?.user?._id || ("" as any),
   });
-  const mood = useQuery(api.emotions.getMoodDescription, {
-    userId: userData?.user?._id || ("" as any),
-  });
 
   if (!userData?.user) {
     return (
-      <div className="min-h-dvh flex items-center justify-center">
-        <div className="w-12 h-12 rounded-full border-2 border-accent border-t-transparent animate-spin" />
+      <div style={{ padding: 24, textAlign: "center" }}>
+        <p style={{ fontFamily: "'Caveat', cursive", fontSize: 20, color: "#666" }}>
+          Loading...
+        </p>
       </div>
     );
   }
 
+  const firstName = userData.user.name?.split(" ")[0] || "Explorer";
+
   return (
-    <main className="min-h-dvh p-6 safe-top">
-      {/* Profile Header */}
-      <motion.section
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        className="text-center mb-8"
+    <div style={{ padding: "20px 16px", maxWidth: 500, margin: "0 auto", position: "relative" }}>
+      {/* Profile card */}
+      <div
+        style={{
+          background: "#f5f0e6",
+          padding: "24px",
+          marginBottom: 20,
+          position: "relative",
+          boxShadow: "3px 4px 12px rgba(0,0,0,0.15)",
+          textAlign: "center",
+        }}
       >
-        <div className="relative inline-block mb-4">
+        <TapeStrip style={{ top: -8, left: 40 }} rotation={-3} color="peach" />
+        <TapeStrip style={{ top: -6, right: 50 }} rotation={2} color="blue" />
+        
+        {/* Avatar */}
+        <div
+          style={{
+            width: 80,
+            height: 80,
+            borderRadius: 12,
+            background: "#fff9c4",
+            margin: "0 auto 16px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 40,
+            boxShadow: "3px 4px 8px rgba(0,0,0,0.15)",
+            transform: "rotate(-3deg)",
+          }}
+        >
           {user?.imageUrl ? (
-            <Image
-              src={user.imageUrl}
-              alt="Profile"
-              width={96}
-              height={96}
-              className="rounded-full"
+            <img 
+              src={user.imageUrl} 
+              alt="" 
+              style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 12 }} 
             />
-          ) : (
-            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-accent to-purple-600 flex items-center justify-center">
-              <User className="w-12 h-12 text-white" />
-            </div>
-          )}
-          
-          {/* Streak badge */}
-          {stats && stats.currentStreak > 0 && (
-            <div className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-yellow-500 flex items-center justify-center text-white text-sm font-bold shadow-lg">
-              {stats.currentStreak}
-            </div>
-          )}
+          ) : "🙂"}
         </div>
 
-        <h1 className="text-xl font-bold">{userData.user.name || "Explorer"}</h1>
-        <p className="text-sm text-muted-foreground">{userData.user.email}</p>
-      </motion.section>
+        <h1 style={{ fontFamily: "'Permanent Marker', cursive", fontSize: 28, color: "#2c2c2c", margin: "0 0 4px 0" }}>
+          {firstName}
+        </h1>
+        <p style={{ fontFamily: "'Caveat', cursive", fontSize: 16, color: "#666", margin: 0 }}>
+          {userData.user.email}
+        </p>
 
-      {/* Nous's current state */}
-      <motion.section
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.1 }}
-        className="mb-8"
-      >
-        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <Brain className="w-5 h-5 text-accent" />
-          How Nous feels about you
-        </h2>
-
-        <div className="p-5 rounded-2xl bg-gradient-to-br from-accent/10 to-purple-500/10 border border-accent/20">
-          <p className="text-foreground leading-relaxed">
-            {mood?.summary || "Still getting to know you..."}
-          </p>
-          
-          {userData.emotionalState && (
-            <div className="mt-4 grid grid-cols-4 gap-2">
-              <MiniStat label="Connection" value={userData.emotionalState.connection} />
-              <MiniStat label="Curiosity" value={userData.emotionalState.curiosity} />
-              <MiniStat label="Energy" value={userData.emotionalState.energy} />
-              <MiniStat label="Mood" value={(userData.emotionalState.valence + 1) / 2} />
-            </div>
-          )}
-        </div>
-      </motion.section>
-
-      {/* Stats */}
-      <motion.section
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.2 }}
-        className="mb-8"
-      >
-        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <Flame className="w-5 h-5 text-accent" />
-          Your Journey
-        </h2>
-
-        <div className="grid grid-cols-3 gap-3">
-          <div className="p-4 rounded-2xl bg-muted text-center">
-            <p className="text-2xl font-bold">{stats?.currentStreak || 0}</p>
-            <p className="text-xs text-muted-foreground">Day Streak</p>
-          </div>
-          <div className="p-4 rounded-2xl bg-muted text-center">
-            <p className="text-2xl font-bold">{stats?.longestStreak || 0}</p>
-            <p className="text-xs text-muted-foreground">Best Streak</p>
-          </div>
-          <div className="p-4 rounded-2xl bg-muted text-center">
-            <p className="text-2xl font-bold">{stats?.totalCardsCompleted || 0}</p>
-            <p className="text-xs text-muted-foreground">Explored</p>
-          </div>
-        </div>
-      </motion.section>
-
-      {/* Quick Actions */}
-      <motion.section
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.3 }}
-        className="mb-8"
-      >
-        <h2 className="text-lg font-semibold mb-4">More</h2>
-        <div className="space-y-2">
-          <ProfileLink href="/journal" icon={<PenLine />} label="Journal" desc="AI-assisted reflection" />
-          <ProfileLink href="/inbox" icon={<Inbox />} label="Inbox" desc="Saved media & notes" />
-          <ProfileLink href="/challenge" icon={<Swords />} label="Daily Challenge" desc="Test your knowledge" />
-          <ProfileLink href="/achievements" icon={<Trophy />} label="Achievements" desc="Your milestones" />
-          <ProfileLink href="/library" icon={<BookOpen />} label="Library" desc="Topics & history" />
-          <ProfileLink href="/paths" icon={<Map />} label="Learning Paths" desc="Guided journeys" />
-          <ProfileLink href="/settings" icon={<Settings />} label="Settings" desc="App preferences" />
-        </div>
-      </motion.section>
-
-      {/* Sign Out */}
-      <motion.section
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.4 }}
-      >
-        <SignOutButton>
-          <button className="w-full p-4 rounded-2xl bg-muted flex items-center gap-3 text-red-500 hover:bg-red-500/10 transition-colors">
-            <LogOut className="w-5 h-5" />
-            <span className="font-medium">Sign Out</span>
-          </button>
-        </SignOutButton>
-      </motion.section>
-    </main>
-  );
-}
-
-function MiniStat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="text-center">
-      <div className="h-1 bg-secondary rounded-full overflow-hidden mb-1">
-        <div 
-          className="h-full bg-accent transition-all"
-          style={{ width: `${value * 100}%` }}
-        />
+        <Doodle type="star" style={{ top: 20, right: 20 }} />
       </div>
-      <p className="text-xs text-muted-foreground">{label}</p>
+
+      {/* Stats - graph paper */}
+      <div
+        style={{
+          background: "#f8f8f8",
+          backgroundImage: "linear-gradient(#d4c4b0 1px, transparent 1px), linear-gradient(90deg, #d4c4b0 1px, transparent 1px)",
+          backgroundSize: "20px 20px",
+          padding: 20,
+          marginBottom: 20,
+          position: "relative",
+          boxShadow: "2px 3px 10px rgba(0,0,0,0.12)",
+          transform: "rotate(0.5deg)",
+        }}
+      >
+        <PaperClip style={{ top: -12, right: 30 }} rotation={-10} />
+        
+        <div style={{ display: "flex", justifyContent: "space-around", fontFamily: "'Caveat', cursive" }}>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 32, fontWeight: 600, color: "#2d5016" }}>
+              {stats?.currentStreak || 0}
+            </div>
+            <div style={{ fontSize: 14, color: "#666" }}>day streak</div>
+          </div>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 32, fontWeight: 600, color: "#c0392b" }}>
+              {stats?.longestStreak || 0}
+            </div>
+            <div style={{ fontSize: 14, color: "#666" }}>best streak</div>
+          </div>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 32, fontWeight: 600, color: "#2980b9" }}>
+              {stats?.totalCardsCompleted || 0}
+            </div>
+            <div style={{ fontSize: 14, color: "#666" }}>explored</div>
+          </div>
+        </div>
+
+        <Doodle type="circle" style={{ top: 8, left: 15 }} />
+      </div>
+
+      {/* Streak badge */}
+      {stats && stats.currentStreak > 0 && (
+        <div style={{ position: "absolute", right: 10, top: 180 }}>
+          <StickyNote color="yellow" rotation={10}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <Flame size={18} color="#ff6b6b" />
+              <span style={{ fontWeight: 600 }}>{stats.currentStreak} days!</span>
+            </div>
+          </StickyNote>
+        </div>
+      )}
+
+      {/* Menu - lined paper */}
+      <div
+        style={{
+          background: "#fefcf6",
+          backgroundImage: "repeating-linear-gradient(transparent, transparent 27px, #e8dcd0 28px)",
+          backgroundSize: "100% 28px",
+          padding: "20px 16px 20px 50px",
+          position: "relative",
+          boxShadow: "4px 5px 15px rgba(0,0,0,0.2)",
+          borderLeft: "3px solid #e8b4b4",
+        }}
+      >
+        {/* Red margin line */}
+        <div style={{ position: "absolute", left: 42, top: 0, bottom: 0, width: 2, background: "#ffcccb" }} />
+        
+        <CoffeeStain style={{ bottom: 20, right: 10, opacity: 0.4, width: 60, height: 60 }} />
+
+        <h2 style={{ fontFamily: "'Architects Daughter', cursive", fontSize: 18, color: "#2c2c2c", marginBottom: 16, borderBottom: "2px dashed #ccc", paddingBottom: 8 }}>
+          more stuff
+        </h2>
+
+        <MenuLink href="/inbox" icon={<Inbox size={20} />} label="inbox" desc="saved media & notes" />
+        <MenuLink href="/achievements" icon={<Trophy size={20} />} label="achievements" desc="your milestones" />
+        <MenuLink href="/library" icon={<BookOpen size={20} />} label="library" desc="topics explored" />
+        <MenuLink href="/settings" icon={<Settings size={20} />} label="settings" desc="preferences" />
+
+        <div style={{ marginTop: 20, paddingTop: 16, borderTop: "2px dashed #ccc" }}>
+          <SignOutButton>
+            <button
+              style={{
+                width: "100%",
+                padding: "12px 16px",
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                fontFamily: "'Architects Daughter', cursive",
+                fontSize: 16,
+                color: "#c0392b",
+              }}
+            >
+              <LogOut size={20} />
+              sign out
+            </button>
+          </SignOutButton>
+        </div>
+      </div>
     </div>
   );
 }
 
-function ProfileLink({ href, icon, label, desc }: { href: string; icon: React.ReactNode; label: string; desc: string }) {
+function MenuLink({ href, icon, label, desc }: { href: string; icon: React.ReactNode; label: string; desc: string }) {
+  const rotation = (Math.random() - 0.5) * 1;
   return (
-    <Link href={href}>
-      <div className="w-full p-4 rounded-2xl bg-muted flex items-center gap-3 hover:bg-secondary transition-colors cursor-pointer">
-        <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent">
-          {icon}
+    <Link href={href} style={{ textDecoration: "none" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          padding: "10px 0",
+          transform: `rotate(${rotation}deg)`,
+        }}
+      >
+        <div style={{ color: "#666" }}>{icon}</div>
+        <div style={{ flex: 1 }}>
+          <p style={{ fontFamily: "'Architects Daughter', cursive", fontSize: 16, color: "#2c2c2c", margin: 0 }}>
+            {label}
+          </p>
+          <p style={{ fontFamily: "'Caveat', cursive", fontSize: 13, color: "#888", margin: 0 }}>
+            {desc}
+          </p>
         </div>
-        <div className="flex-1">
-          <p className="font-medium">{label}</p>
-          <p className="text-xs text-muted-foreground">{desc}</p>
-        </div>
-        <ChevronRight className="w-5 h-5 text-muted-foreground" />
+        <ChevronRight size={18} style={{ color: "#ccc" }} />
       </div>
     </Link>
   );
