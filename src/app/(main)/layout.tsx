@@ -4,7 +4,7 @@ import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { motion } from "framer-motion";
-import { Home, MessageCircle, Brain, User, Target } from "lucide-react";
+import { Home, MessageCircle, Target, BookOpen, User } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -25,22 +25,25 @@ export default function MainLayout({
 
   if (!isLoaded || !isSignedIn) {
     return (
-      <div className="min-h-dvh flex items-center justify-center">
+      <div className="min-h-dvh gradient-bg flex items-center justify-center">
         <div className="w-12 h-12 rounded-full border-2 border-accent border-t-transparent animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-dvh pb-20">
-      {children}
+    <div className="min-h-dvh gradient-bg pb-24 relative">
+      <div className="relative z-10">
+        {children}
+      </div>
 
-      {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 glass border-t border-secondary safe-bottom">
-        <div className="flex items-center justify-around py-3 max-w-lg mx-auto">
+      {/* Bottom Navigation - Glassmorphism */}
+      <nav className="fixed bottom-0 left-0 right-0 glass-nav safe-bottom z-50">
+        <div className="flex items-center justify-around py-3 max-w-lg mx-auto px-4">
           <NavItem href="/home" icon={Home} label="Home" active={pathname === "/home"} />
           <NavItem href="/chat" icon={MessageCircle} label="Chat" active={pathname === "/chat"} />
           <NavItem href="/habits" icon={Target} label="Habits" active={pathname === "/habits"} />
+          <NavItem href="/journal" icon={BookOpen} label="Journal" active={pathname === "/journal"} />
           <NavItem href="/profile" icon={User} label="Profile" active={pathname === "/profile"} />
         </div>
       </nav>
@@ -61,18 +64,26 @@ function NavItem({
 }) {
   return (
     <Link href={href} className="relative">
-      <div className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-colors ${
-        active ? "text-accent" : "text-muted-foreground hover:text-foreground"
-      }`}>
-        <Icon className="w-6 h-6" />
+      <motion.div 
+        className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all duration-300 ${
+          active 
+            ? "text-white" 
+            : "text-white/40 hover:text-white/70"
+        }`}
+        whileTap={{ scale: 0.95 }}
+      >
+        <div className={`relative ${active ? "drop-shadow-[0_0_8px_rgba(99,102,241,0.8)]" : ""}`}>
+          <Icon className="w-6 h-6" />
+        </div>
         <span className="text-xs font-medium">{label}</span>
         {active && (
           <motion.div
             layoutId="nav-indicator"
-            className="absolute -bottom-1 w-1 h-1 rounded-full bg-accent"
+            className="absolute -bottom-1 w-8 h-1 rounded-full bg-gradient-to-r from-accent to-purple-500"
+            style={{ boxShadow: "0 0 10px rgba(99, 102, 241, 0.5)" }}
           />
         )}
-      </div>
+      </motion.div>
     </Link>
   );
 }
