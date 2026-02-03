@@ -77,5 +77,23 @@ A knowledge companion that grows with you — combining emotional depth, self-ev
 - ✅ Added starter questions per topic
 - ✅ Added depth tracking (1-5 scale)
 - ✅ Topic-specific gradients and icons
-- Next: Onboarding flow, voice mode, unique UX elements
+
+### 2026-02-03 18:30 UTC - Iteration 3: Onboarding & Voice
+- ✅ Created 5-step onboarding flow (welcome, name, interests, style, ready)
+- ✅ Added VoiceButton component with Web Speech API
+- ✅ Added speak() utility for text-to-speech
+- ✅ Created EmotionalOrb component with mood-based colors
+- ✅ Created EmotionalAmbience background effect
+- ✅ Created LoadingScreen, LoadingDots, TypingIndicator components
+- ✅ Created TopicCard and TopicCardCompact components
+
+### 2026-02-03 18:40 UTC - Iteration 4: Insights & Polish
+- ✅ Created Insights page with:
+  - Connection narrative
+  - Emotion meters
+  - AI-generated observations
+  - Daily reflection from Nous
+- ✅ Updated navigation to include Insights
+- ✅ Build passing, pushed to GitHub
+- Next: Conversation mood timeline, better animations, deployment
 
