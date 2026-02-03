@@ -5,20 +5,26 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
-import { 
-  Brain, Flame, BookOpen, MessageCircle, 
-  Sparkles, ChevronRight, Palette, Scale, 
-  Clock, Globe, Heart, Target, Check
-} from "lucide-react";
+import { motion } from "framer-motion";
 import Link from "next/link";
+import {
+  TactileCard,
+  TactileButton,
+  TactileCheckbox,
+  TactileProgress,
+  TactileBadge,
+  TactileListItem,
+  TactileDivider,
+  TactileFAB,
+} from "@/components/tactile/TactileElements";
+import { MessageCircle, Flame, BookOpen, Target, Brain, Sparkles, Plus } from "lucide-react";
 
 const TOPIC_CONFIG = {
-  philosophy: { icon: Brain, color: "topic-philosophy", label: "Philosophy" },
-  history: { icon: Clock, color: "topic-history", label: "History" },
-  economics: { icon: Scale, color: "topic-economics", label: "Economics" },
-  art: { icon: Palette, color: "topic-art", label: "Art" },
-  psychology: { icon: Heart, color: "topic-psychology", label: "Psychology" },
+  philosophy: { emoji: "🤔", color: "#9b7bb8" },
+  history: { emoji: "📜", color: "#7d9b76" },
+  economics: { emoji: "📈", color: "#7a99b5" },
+  art: { emoji: "🎨", color: "#c4956a" },
+  psychology: { emoji: "🧠", color: "#c27c7c" },
 };
 
 export default function HomePage() {
@@ -38,15 +44,7 @@ export default function HomePage() {
   });
   const generateCards = useMutation(api.knowledge.generateDailyCards);
   const syncUser = useMutation(api.users.syncUser);
-
-  const [greeting, setGreeting] = useState("");
-
-  // Redirect to onboarding if not completed
-  useEffect(() => {
-    if (userData?.user && userData?.learningProgress && !userData.learningProgress.preferredStyle) {
-      router.push("/onboarding");
-    }
-  }, [userData, router]);
+  const logHabit = useMutation(api.habits.logHabit);
 
   // Sync user on first load
   useEffect(() => {
@@ -60,6 +58,13 @@ export default function HomePage() {
     }
   }, [user, userData, syncUser]);
 
+  // Redirect to onboarding if not completed
+  useEffect(() => {
+    if (userData?.user && userData?.learningProgress && !userData.learningProgress.preferredStyle) {
+      router.push("/onboarding");
+    }
+  }, [userData, router]);
+
   // Generate cards if needed
   useEffect(() => {
     if (userData?.user && todayCards?.length === 0) {
@@ -67,220 +72,289 @@ export default function HomePage() {
     }
   }, [userData, todayCards, generateCards]);
 
-  // Dynamic greeting based on emotional state
-  useEffect(() => {
-    if (!userData?.emotionalState) {
-      setGreeting("Hello");
-      return;
-    }
-
-    const { valence, connection, curiosity } = userData.emotionalState;
-    
-    if (connection > 0.6) {
-      setGreeting(valence > 0.3 ? "Great to see you again!" : "I've missed you");
-    } else if (curiosity > 0.6) {
-      setGreeting("Ready to explore something new?");
-    } else if (valence > 0.3) {
-      setGreeting("Feeling good today");
-    } else {
-      setGreeting("Welcome back");
-    }
-  }, [userData?.emotionalState]);
-
   if (!userData?.user) {
     return (
-      <div className="min-h-dvh flex items-center justify-center">
-        <div className="w-12 h-12 rounded-full border-2 border-accent border-t-transparent animate-spin" />
+      <div 
+        style={{ 
+          minHeight: "100vh", 
+          background: "#f0e6d8",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <motion.div
+          animate={{ scale: [1, 1.05, 1] }}
+          transition={{ duration: 1.5, repeat: Infinity }}
+          style={{
+            width: 60,
+            height: 60,
+            background: "linear-gradient(145deg, #c4956a, #b38656)",
+            borderRadius: 16,
+            boxShadow: "4px 4px 12px rgba(0, 0, 0, 0.1), -2px -2px 8px rgba(255, 255, 255, 0.5)",
+          }}
+        />
       </div>
     );
   }
 
-  const emotionalState = userData.emotionalState;
   const firstName = userData.user.name?.split(" ")[0] || "friend";
+  const completedHabits = habitProgress?.filter(h => h.isCompletedToday).length || 0;
+  const totalHabits = habitProgress?.length || 0;
+  const completedCards = todayCards?.filter(c => c.completed).length || 0;
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 17) return "Good afternoon";
+    return "Good evening";
+  };
 
   return (
-    <main className="min-h-dvh p-6 safe-top safe-bottom">
-      {/* Header */}
-      <motion.header
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        className="flex items-center justify-between mb-8"
-      >
-        <div>
-          <p className="text-muted-foreground text-sm">{greeting}</p>
-          <h1 className="text-2xl font-bold">{firstName}</h1>
-        </div>
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#f0e6d8",
+        padding: "24px 16px",
+        paddingBottom: 100,
+      }}
+    >
+      <div style={{ maxWidth: 500, margin: "0 auto" }}>
         
-        {/* Emotional state indicator */}
-        <EmotionOrb state={emotionalState} />
-      </motion.header>
-
-      {/* Streak Banner */}
-      {stats && stats.currentStreak > 0 && (
+        {/* Header */}
         <motion.div
-          initial={{ scale: 0.95, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-orange-500/10 to-yellow-500/10 border border-orange-500/20 flex items-center gap-3"
+          initial={{ y: -20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          style={{ marginBottom: 24 }}
         >
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500 to-yellow-500 flex items-center justify-center">
-            <Flame className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <p className="font-semibold">{stats.currentStreak} day streak!</p>
-            <p className="text-sm text-muted-foreground">
-              {stats.totalCardsCompleted} cards explored
-            </p>
+          <p style={{ color: "#8a7b6d", fontSize: 14, marginBottom: 4 }}>
+            {getGreeting()}
+          </p>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <h1 style={{ fontSize: 28, fontWeight: 700, color: "#4a4035", margin: 0 }}>
+              {firstName}
+            </h1>
+            {stats && stats.currentStreak > 0 && (
+              <TactileBadge color="warning">
+                <Flame size={14} style={{ marginRight: 4, display: "inline" }} />
+                {stats.currentStreak} day streak
+              </TactileBadge>
+            )}
           </div>
         </motion.div>
-      )}
 
-      {/* Today's Habits */}
-      {habitProgress && habitProgress.length > 0 && (
-        <motion.section
+        {/* Daily Progress Card */}
+        <motion.div
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.1 }}
-          className="mb-8"
         >
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <Target className="w-5 h-5 text-accent" />
-              Today's Habits
-            </h2>
-            <Link href="/habits" className="text-sm text-accent">
-              See all
-            </Link>
-          </div>
-          
-          <div className="grid grid-cols-4 gap-2">
-            {habitProgress.slice(0, 4).map((habit) => (
+          <TactileCard style={{ marginBottom: 20 }} variant="floating">
+            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16 }}>
               <div
-                key={habit._id}
-                className={`p-3 rounded-xl text-center transition-all ${
-                  habit.isCompletedToday
-                    ? "bg-accent/20 ring-2 ring-accent"
-                    : "bg-muted"
-                }`}
+                style={{
+                  width: 56,
+                  height: 56,
+                  background: "linear-gradient(145deg, #c4956a, #b38656)",
+                  borderRadius: 16,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow: "4px 4px 12px rgba(196, 149, 106, 0.3)",
+                }}
               >
-                <span className="text-2xl">{habit.icon || "✨"}</span>
-                {habit.isCompletedToday && (
-                  <div className="flex justify-center mt-1">
-                    <Check className="w-4 h-4 text-accent" />
-                  </div>
-                )}
+                <Sparkles size={28} color="white" />
               </div>
-            ))}
-          </div>
-          
-          {/* Progress bar */}
-          <div className="mt-3 h-2 bg-secondary rounded-full overflow-hidden">
-            <motion.div
-              className="h-full bg-accent"
-              initial={{ width: 0 }}
-              animate={{ 
-                width: `${(habitProgress.filter(h => h.isCompletedToday).length / habitProgress.length) * 100}%` 
-              }}
-              transition={{ delay: 0.3, duration: 0.5 }}
+              <div>
+                <p style={{ color: "#4a4035", fontSize: 18, fontWeight: 600, margin: 0 }}>
+                  Today's Progress
+                </p>
+                <p style={{ color: "#8a7b6d", fontSize: 14, margin: 0 }}>
+                  {completedCards + completedHabits} / {(todayCards?.length || 0) + totalHabits} completed
+                </p>
+              </div>
+            </div>
+            <TactileProgress 
+              value={completedCards + completedHabits} 
+              max={(todayCards?.length || 0) + totalHabits || 1} 
             />
+          </TactileCard>
+        </motion.div>
+
+        {/* Habits Section */}
+        {habitProgress && habitProgress.length > 0 && (
+          <motion.div
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            style={{ marginBottom: 24 }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <h2 style={{ fontSize: 18, fontWeight: 600, color: "#4a4035", margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
+                <Target size={20} color="#7d9b76" />
+                Habits
+              </h2>
+              <Link href="/habits" style={{ color: "#c4956a", fontSize: 14, textDecoration: "none" }}>
+                See all →
+              </Link>
+            </div>
+            
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {habitProgress.slice(0, 4).map((habit, index) => (
+                <motion.div
+                  key={habit._id}
+                  initial={{ x: -20, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  transition={{ delay: 0.3 + index * 0.05 }}
+                >
+                  <TactileListItem
+                    onClick={() => logHabit({
+                      userId: userData.user._id,
+                      habitId: habit._id,
+                      completed: !habit.isCompletedToday,
+                    })}
+                    active={habit.isCompletedToday}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <TactileCheckbox
+                        checked={habit.isCompletedToday}
+                        onChange={() => {}}
+                      />
+                      <span style={{ 
+                        color: habit.isCompletedToday ? "#8a7b6d" : "#4a4035",
+                        textDecoration: habit.isCompletedToday ? "line-through" : "none",
+                        fontSize: 16,
+                      }}>
+                        {habit.icon} {habit.name}
+                      </span>
+                    </div>
+                  </TactileListItem>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
+        {/* Knowledge Cards Section */}
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          style={{ marginBottom: 24 }}
+        >
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <h2 style={{ fontSize: 18, fontWeight: 600, color: "#4a4035", margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
+              <BookOpen size={20} color="#9b7bb8" />
+              Today's Discoveries
+            </h2>
+            <span style={{ color: "#8a7b6d", fontSize: 14 }}>
+              {completedCards}/{todayCards?.length || 0}
+            </span>
           </div>
-          <p className="text-sm text-muted-foreground mt-2 text-center">
-            {habitProgress.filter(h => h.isCompletedToday).length} of {habitProgress.length} completed
-          </p>
-        </motion.section>
-      )}
 
-      {/* Today's Discoveries */}
-      <section className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-accent" />
-            Today's Discoveries
-          </h2>
-          <span className="text-sm text-muted-foreground">
-            {todayCards?.filter(c => c.completed).length || 0}/3
-          </span>
-        </div>
-
-        <div className="space-y-3">
-          <AnimatePresence mode="popLayout">
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {todayCards?.map((card, index) => {
               const config = TOPIC_CONFIG[card.topic as keyof typeof TOPIC_CONFIG];
-              const Icon = config?.icon || BookOpen;
-
+              
               return (
                 <motion.div
                   key={card._id}
                   initial={{ x: -20, opacity: 0 }}
                   animate={{ x: 0, opacity: 1 }}
-                  transition={{ delay: index * 0.1 }}
+                  transition={{ delay: 0.4 + index * 0.1 }}
                 >
-                  <Link href={`/explore/${card._id}`}>
-                    <div
-                      className={`p-4 rounded-2xl ${config?.color || "bg-muted"} text-white relative overflow-hidden group cursor-pointer active:scale-[0.98] transition-transform`}
+                  <Link href={`/explore/${card._id}`} style={{ textDecoration: "none" }}>
+                    <TactileCard
+                      variant={card.completed ? "pressed" : "raised"}
+                      style={{ 
+                        opacity: card.completed ? 0.7 : 1,
+                        padding: 16,
+                      }}
                     >
-                      {card.completed && (
-                        <div className="absolute top-3 right-3 w-6 h-6 rounded-full bg-white/20 flex items-center justify-center">
-                          ✓
+                      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                        <div
+                          style={{
+                            width: 44,
+                            height: 44,
+                            background: card.completed 
+                              ? "#e8ddd0"
+                              : `linear-gradient(145deg, ${config?.color || "#c4956a"}, ${adjustColor(config?.color || "#c4956a", -15)})`,
+                            borderRadius: 12,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: 22,
+                            boxShadow: card.completed 
+                              ? "inset 2px 2px 6px rgba(0, 0, 0, 0.08)"
+                              : `3px 3px 10px ${config?.color || "#c4956a"}30`,
+                          }}
+                        >
+                          {card.completed ? "✓" : config?.emoji || "📚"}
                         </div>
-                      )}
-                      <Icon className="w-8 h-8 mb-2 opacity-80" />
-                      <p className="font-semibold">{config?.label || card.topic}</p>
-                      <p className="text-sm opacity-80 mt-1">
-                        {card.completed ? card.title : "Tap to explore"}
-                      </p>
-                      <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 opacity-50 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
-                    </div>
+                        <div style={{ flex: 1 }}>
+                          <p style={{ 
+                            color: card.completed ? "#8a7b6d" : "#4a4035", 
+                            fontSize: 16, 
+                            fontWeight: 600, 
+                            margin: 0,
+                            textDecoration: card.completed ? "line-through" : "none",
+                          }}>
+                            {card.topic.charAt(0).toUpperCase() + card.topic.slice(1)}
+                          </p>
+                          <p style={{ color: "#8a7b6d", fontSize: 13, margin: "2px 0 0 0" }}>
+                            {card.completed ? card.title : "Tap to explore"}
+                          </p>
+                        </div>
+                      </div>
+                    </TactileCard>
                   </Link>
                 </motion.div>
               );
             })}
-          </AnimatePresence>
-        </div>
-      </section>
+          </div>
+        </motion.div>
 
-      {/* Quick Chat */}
-      <section>
-        <h2 className="text-lg font-semibold flex items-center gap-2 mb-4">
-          <MessageCircle className="w-5 h-5 text-accent" />
-          Continue Learning
-        </h2>
+        {/* Quick Actions */}
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.5 }}
+        >
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <Link href="/chat" style={{ textDecoration: "none" }}>
+              <TactileCard style={{ padding: 16, textAlign: "center" }}>
+                <MessageCircle size={28} color="#7a99b5" style={{ marginBottom: 8 }} />
+                <p style={{ color: "#4a4035", fontSize: 14, fontWeight: 600, margin: 0 }}>
+                  Chat with Nous
+                </p>
+              </TactileCard>
+            </Link>
+            <Link href="/journal" style={{ textDecoration: "none" }}>
+              <TactileCard style={{ padding: 16, textAlign: "center" }}>
+                <Brain size={28} color="#c4956a" style={{ marginBottom: 8 }} />
+                <p style={{ color: "#4a4035", fontSize: 14, fontWeight: 600, margin: 0 }}>
+                  Journal
+                </p>
+              </TactileCard>
+            </Link>
+          </div>
+        </motion.div>
+      </div>
 
-        <Link href="/chat">
-          <motion.div
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className="p-5 rounded-2xl bg-muted border border-secondary hover:border-accent/30 transition-colors cursor-pointer"
-          >
-            <p className="text-muted-foreground">
-              Ask me anything about philosophy, history, economics, art, or psychology...
-            </p>
-          </motion.div>
-        </Link>
-      </section>
-
-      {/* Bottom nav will go here */}
-    </main>
+      {/* FAB */}
+      <Link href="/habits">
+        <TactileFAB icon={<Plus size={28} />} />
+      </Link>
+    </div>
   );
 }
 
-function EmotionOrb({ state }: { state: any }) {
-  if (!state) return null;
-
-  // Determine dominant emotion color
-  let emotionClass = "emotion-neutral";
-  if (state.valence > 0.3) emotionClass = "emotion-positive";
-  else if (state.valence < -0.3) emotionClass = "emotion-negative";
-  else if (state.arousal > 0.6) emotionClass = "emotion-excited";
-  else if (state.curiosity > 0.6) emotionClass = "emotion-curious";
-  else if (state.connection > 0.6) emotionClass = "emotion-connected";
-
-  return (
-    <motion.div
-      animate={{ scale: [1, 1.05, 1] }}
-      transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-      className={`w-12 h-12 rounded-full bg-gradient-to-br from-accent to-purple-600 emotion-ring ${emotionClass} flex items-center justify-center`}
-    >
-      <Brain className="w-6 h-6 text-white" />
-    </motion.div>
-  );
+// Helper to adjust color brightness
+function adjustColor(color: string, amount: number): string {
+  const hex = color.replace("#", "");
+  const num = parseInt(hex, 16);
+  const r = Math.min(255, Math.max(0, (num >> 16) + amount));
+  const g = Math.min(255, Math.max(0, ((num >> 8) & 0x00ff) + amount));
+  const b = Math.min(255, Math.max(0, (num & 0x0000ff) + amount));
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
 }

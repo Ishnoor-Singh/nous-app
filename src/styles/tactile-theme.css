@@ -1,0 +1,285 @@
+/* Tactile Theme - Soft 3D, Clay-like, Physical */
+
+:root {
+  /* Warm, soft colors */
+  --tactile-bg: #f0e6d8;
+  --tactile-surface: #f7f0e6;
+  --tactile-elevated: #fdf8f2;
+  --tactile-pressed: #e8ddd0;
+  
+  /* Accent colors - soft and warm */
+  --tactile-primary: #8b7355;
+  --tactile-accent: #c4956a;
+  --tactile-success: #7d9b76;
+  --tactile-warning: #d4a574;
+  --tactile-danger: #c27c7c;
+  --tactile-info: #7a99b5;
+  
+  /* Text */
+  --tactile-text: #4a4035;
+  --tactile-text-muted: #8a7b6d;
+  --tactile-text-light: #b5a596;
+  
+  /* Shadows for depth */
+  --shadow-raised: 
+    4px 4px 12px rgba(0, 0, 0, 0.08),
+    -2px -2px 8px rgba(255, 255, 255, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    
+  --shadow-pressed:
+    inset 2px 2px 6px rgba(0, 0, 0, 0.08),
+    inset -1px -1px 4px rgba(255, 255, 255, 0.3);
+    
+  --shadow-floating:
+    8px 8px 24px rgba(0, 0, 0, 0.12),
+    -4px -4px 16px rgba(255, 255, 255, 0.8);
+
+  --shadow-soft:
+    2px 2px 8px rgba(0, 0, 0, 0.05),
+    -1px -1px 4px rgba(255, 255, 255, 0.5);
+}
+
+/* Base tactile surface */
+.tactile-surface {
+  background: var(--tactile-surface);
+  border-radius: 20px;
+  box-shadow: var(--shadow-raised);
+  transition: all 0.2s ease;
+}
+
+.tactile-surface:active {
+  box-shadow: var(--shadow-pressed);
+  transform: translateY(1px);
+}
+
+/* Raised card */
+.tactile-card {
+  background: linear-gradient(145deg, var(--tactile-elevated), var(--tactile-surface));
+  border-radius: 24px;
+  box-shadow: var(--shadow-floating);
+  padding: 20px;
+}
+
+/* Pill button */
+.tactile-pill {
+  background: linear-gradient(145deg, var(--tactile-elevated), var(--tactile-surface));
+  border-radius: 50px;
+  box-shadow: var(--shadow-raised);
+  padding: 12px 24px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-weight: 600;
+  color: var(--tactile-text);
+}
+
+.tactile-pill:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-floating);
+}
+
+.tactile-pill:active {
+  transform: translateY(1px);
+  box-shadow: var(--shadow-pressed);
+}
+
+/* Toggle switch */
+.tactile-toggle {
+  width: 56px;
+  height: 32px;
+  background: var(--tactile-pressed);
+  border-radius: 16px;
+  position: relative;
+  cursor: pointer;
+  box-shadow: var(--shadow-pressed);
+  transition: all 0.3s ease;
+}
+
+.tactile-toggle.active {
+  background: var(--tactile-success);
+}
+
+.tactile-toggle::after {
+  content: '';
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  background: linear-gradient(145deg, #fff, var(--tactile-surface));
+  border-radius: 50%;
+  top: 3px;
+  left: 3px;
+  box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.tactile-toggle.active::after {
+  left: 27px;
+}
+
+/* Checkbox - soft pillow */
+.tactile-checkbox {
+  width: 28px;
+  height: 28px;
+  background: var(--tactile-pressed);
+  border-radius: 8px;
+  box-shadow: var(--shadow-pressed);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.tactile-checkbox.checked {
+  background: var(--tactile-success);
+  box-shadow: var(--shadow-raised);
+}
+
+.tactile-checkbox.checked::after {
+  content: '✓';
+  color: white;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+/* Progress bar */
+.tactile-progress {
+  height: 12px;
+  background: var(--tactile-pressed);
+  border-radius: 6px;
+  box-shadow: var(--shadow-pressed);
+  overflow: hidden;
+}
+
+.tactile-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--tactile-accent), var(--tactile-warning));
+  border-radius: 6px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: width 0.5s ease;
+}
+
+/* Input field */
+.tactile-input {
+  background: var(--tactile-pressed);
+  border: none;
+  border-radius: 16px;
+  padding: 16px 20px;
+  box-shadow: var(--shadow-pressed);
+  color: var(--tactile-text);
+  font-size: 16px;
+  transition: all 0.2s ease;
+}
+
+.tactile-input:focus {
+  outline: none;
+  box-shadow: var(--shadow-pressed), 0 0 0 3px rgba(196, 149, 106, 0.3);
+}
+
+.tactile-input::placeholder {
+  color: var(--tactile-text-light);
+}
+
+/* Badge */
+.tactile-badge {
+  background: linear-gradient(145deg, var(--tactile-accent), var(--tactile-warning));
+  color: white;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 2px 2px 8px rgba(196, 149, 106, 0.3);
+}
+
+/* Icon button */
+.tactile-icon-btn {
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(145deg, var(--tactile-elevated), var(--tactile-surface));
+  border-radius: 14px;
+  box-shadow: var(--shadow-raised);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  color: var(--tactile-text);
+}
+
+.tactile-icon-btn:active {
+  box-shadow: var(--shadow-pressed);
+  transform: scale(0.95);
+}
+
+/* Floating action button */
+.tactile-fab {
+  width: 64px;
+  height: 64px;
+  background: linear-gradient(145deg, var(--tactile-accent), #b38656);
+  border-radius: 20px;
+  box-shadow: 
+    6px 6px 16px rgba(0, 0, 0, 0.15),
+    -3px -3px 10px rgba(255, 255, 255, 0.6);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 28px;
+  transition: all 0.2s ease;
+}
+
+.tactile-fab:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 
+    8px 8px 20px rgba(0, 0, 0, 0.18),
+    -4px -4px 12px rgba(255, 255, 255, 0.7);
+}
+
+.tactile-fab:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* Divider */
+.tactile-divider {
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--tactile-pressed), transparent);
+  margin: 16px 0;
+}
+
+/* List item */
+.tactile-list-item {
+  background: var(--tactile-surface);
+  border-radius: 16px;
+  padding: 16px 20px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow-soft);
+  transition: all 0.2s ease;
+}
+
+.tactile-list-item:active {
+  box-shadow: var(--shadow-pressed);
+  transform: scale(0.99);
+}
+
+/* Animation for tactile feedback */
+@keyframes tactile-bounce {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(0.95); }
+}
+
+@keyframes tactile-wiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-2deg); }
+  75% { transform: rotate(2deg); }
+}
+
+.tactile-bounce {
+  animation: tactile-bounce 0.2s ease;
+}
+
+.tactile-wiggle {
+  animation: tactile-wiggle 0.3s ease;
+}
