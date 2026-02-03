@@ -4,13 +4,9 @@ import { useUser, SignOutButton } from "@clerk/nextjs";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { motion } from "framer-motion";
-import { 
-  User, Flame, Brain, Settings, 
-  LogOut, Trophy, BookOpen, Map,
-  Swords, ChevronRight, PenLine, Inbox
-} from "lucide-react";
-import Image from "next/image";
+import { LogOut, Settings, BookOpen, Trophy, Inbox, ChevronRight, Flame, User } from "lucide-react";
 import Link from "next/link";
+import { TactileCard, TactileBadge } from "@/components/tactile/TactileElements";
 
 export default function ProfilePage() {
   const { user } = useUser();
@@ -20,172 +16,188 @@ export default function ProfilePage() {
   const stats = useQuery(api.knowledge.getStats, {
     userId: userData?.user?._id || ("" as any),
   });
-  const mood = useQuery(api.emotions.getMoodDescription, {
-    userId: userData?.user?._id || ("" as any),
-  });
 
   if (!userData?.user) {
     return (
-      <div className="min-h-dvh flex items-center justify-center">
-        <div className="w-12 h-12 rounded-full border-2 border-accent border-t-transparent animate-spin" />
+      <div style={{ padding: 24, display: "flex", alignItems: "center", justifyContent: "center", minHeight: "50vh" }}>
+        <motion.div
+          animate={{ scale: [1, 1.05, 1] }}
+          transition={{ duration: 1.5, repeat: Infinity }}
+          style={{
+            width: 48,
+            height: 48,
+            background: "linear-gradient(145deg, #c4956a, #b38656)",
+            borderRadius: 14,
+          }}
+        />
       </div>
     );
   }
 
+  const firstName = userData.user.name?.split(" ")[0] || "Explorer";
+
   return (
-    <main className="min-h-dvh p-6 safe-top">
-      {/* Profile Header */}
-      <motion.section
+    <div style={{ padding: "20px 16px", maxWidth: 500, margin: "0 auto" }}>
+      {/* Profile Card */}
+      <motion.div
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="text-center mb-8"
       >
-        <div className="relative inline-block mb-4">
-          {user?.imageUrl ? (
-            <Image
-              src={user.imageUrl}
-              alt="Profile"
-              width={96}
-              height={96}
-              className="rounded-full"
-            />
-          ) : (
-            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-accent to-purple-600 flex items-center justify-center">
-              <User className="w-12 h-12 text-white" />
-            </div>
-          )}
-          
-          {/* Streak badge */}
+        <TactileCard variant="floating" style={{ textAlign: "center", marginBottom: 24, padding: 28 }}>
+          {/* Avatar */}
+          <div
+            style={{
+              width: 88,
+              height: 88,
+              borderRadius: 24,
+              background: "linear-gradient(145deg, #c4956a, #b38656)",
+              margin: "0 auto 16px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxShadow: "6px 6px 20px rgba(196, 149, 106, 0.3), -3px -3px 12px rgba(255, 255, 255, 0.5)",
+              overflow: "hidden",
+            }}
+          >
+            {user?.imageUrl ? (
+              <img 
+                src={user.imageUrl} 
+                alt="" 
+                style={{ width: "100%", height: "100%", objectFit: "cover" }} 
+              />
+            ) : (
+              <User size={44} color="white" />
+            )}
+          </div>
+
+          <h1 style={{ fontSize: 26, fontWeight: 700, color: "#4a4035", margin: "0 0 4px 0" }}>
+            {firstName}
+          </h1>
+          <p style={{ fontSize: 14, color: "#8a7b6d", margin: 0 }}>
+            {userData.user.email}
+          </p>
+
+          {/* Streak Badge */}
           {stats && stats.currentStreak > 0 && (
-            <div className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-yellow-500 flex items-center justify-center text-white text-sm font-bold shadow-lg">
-              {stats.currentStreak}
+            <div style={{ marginTop: 16, display: "flex", justifyContent: "center" }}>
+              <TactileBadge color="warning">
+                <Flame size={14} style={{ marginRight: 4 }} />
+                {stats.currentStreak} day streak!
+              </TactileBadge>
             </div>
           )}
-        </div>
+        </TactileCard>
+      </motion.div>
 
-        <h1 className="text-xl font-bold">{userData.user.name || "Explorer"}</h1>
-        <p className="text-sm text-muted-foreground">{userData.user.email}</p>
-      </motion.section>
-
-      {/* Nous's current state */}
-      <motion.section
+      {/* Stats */}
+      <motion.div
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.1 }}
-        className="mb-8"
+        style={{ marginBottom: 24 }}
       >
-        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <Brain className="w-5 h-5 text-accent" />
-          How Nous feels about you
-        </h2>
+        <TactileCard>
+          <div style={{ display: "flex", justifyContent: "space-around" }}>
+            <StatItem value={stats?.currentStreak || 0} label="Day Streak" color="#7d9b76" />
+            <StatItem value={stats?.longestStreak || 0} label="Best Streak" color="#d4a574" />
+            <StatItem value={stats?.totalCardsCompleted || 0} label="Explored" color="#7a99b5" />
+          </div>
+        </TactileCard>
+      </motion.div>
 
-        <div className="p-5 rounded-2xl bg-gradient-to-br from-accent/10 to-purple-500/10 border border-accent/20">
-          <p className="text-foreground leading-relaxed">
-            {mood?.summary || "Still getting to know you..."}
-          </p>
-          
-          {userData.emotionalState && (
-            <div className="mt-4 grid grid-cols-4 gap-2">
-              <MiniStat label="Connection" value={userData.emotionalState.connection} />
-              <MiniStat label="Curiosity" value={userData.emotionalState.curiosity} />
-              <MiniStat label="Energy" value={userData.emotionalState.energy} />
-              <MiniStat label="Mood" value={(userData.emotionalState.valence + 1) / 2} />
-            </div>
-          )}
-        </div>
-      </motion.section>
-
-      {/* Stats */}
-      <motion.section
+      {/* Menu */}
+      <motion.div
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.2 }}
-        className="mb-8"
       >
-        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <Flame className="w-5 h-5 text-accent" />
-          Your Journey
-        </h2>
+        <TactileCard style={{ padding: 8 }}>
+          <MenuLink href="/inbox" icon={<Inbox size={20} />} label="Inbox" desc="Saved media & notes" />
+          <MenuLink href="/achievements" icon={<Trophy size={20} />} label="Achievements" desc="Your milestones" />
+          <MenuLink href="/library" icon={<BookOpen size={20} />} label="Library" desc="Topics explored" />
+          <MenuLink href="/settings" icon={<Settings size={20} />} label="Settings" desc="Preferences" />
 
-        <div className="grid grid-cols-3 gap-3">
-          <div className="p-4 rounded-2xl bg-muted text-center">
-            <p className="text-2xl font-bold">{stats?.currentStreak || 0}</p>
-            <p className="text-xs text-muted-foreground">Day Streak</p>
-          </div>
-          <div className="p-4 rounded-2xl bg-muted text-center">
-            <p className="text-2xl font-bold">{stats?.longestStreak || 0}</p>
-            <p className="text-xs text-muted-foreground">Best Streak</p>
-          </div>
-          <div className="p-4 rounded-2xl bg-muted text-center">
-            <p className="text-2xl font-bold">{stats?.totalCardsCompleted || 0}</p>
-            <p className="text-xs text-muted-foreground">Explored</p>
-          </div>
-        </div>
-      </motion.section>
+          <div 
+            style={{ 
+              height: 1, 
+              background: "linear-gradient(90deg, transparent, #e0d6c8, transparent)", 
+              margin: "8px 16px" 
+            }} 
+          />
 
-      {/* Quick Actions */}
-      <motion.section
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.3 }}
-        className="mb-8"
-      >
-        <h2 className="text-lg font-semibold mb-4">More</h2>
-        <div className="space-y-2">
-          <ProfileLink href="/journal" icon={<PenLine />} label="Journal" desc="AI-assisted reflection" />
-          <ProfileLink href="/inbox" icon={<Inbox />} label="Inbox" desc="Saved media & notes" />
-          <ProfileLink href="/challenge" icon={<Swords />} label="Daily Challenge" desc="Test your knowledge" />
-          <ProfileLink href="/achievements" icon={<Trophy />} label="Achievements" desc="Your milestones" />
-          <ProfileLink href="/library" icon={<BookOpen />} label="Library" desc="Topics & history" />
-          <ProfileLink href="/paths" icon={<Map />} label="Learning Paths" desc="Guided journeys" />
-          <ProfileLink href="/settings" icon={<Settings />} label="Settings" desc="App preferences" />
-        </div>
-      </motion.section>
-
-      {/* Sign Out */}
-      <motion.section
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.4 }}
-      >
-        <SignOutButton>
-          <button className="w-full p-4 rounded-2xl bg-muted flex items-center gap-3 text-red-500 hover:bg-red-500/10 transition-colors">
-            <LogOut className="w-5 h-5" />
-            <span className="font-medium">Sign Out</span>
-          </button>
-        </SignOutButton>
-      </motion.section>
-    </main>
-  );
-}
-
-function MiniStat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="text-center">
-      <div className="h-1 bg-secondary rounded-full overflow-hidden mb-1">
-        <div 
-          className="h-full bg-accent transition-all"
-          style={{ width: `${value * 100}%` }}
-        />
-      </div>
-      <p className="text-xs text-muted-foreground">{label}</p>
+          <SignOutButton>
+            <motion.button
+              whileTap={{ scale: 0.98 }}
+              style={{
+                width: "100%",
+                padding: "14px 20px",
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 14,
+                fontSize: 16,
+                color: "#c26b5e",
+                borderRadius: 12,
+              }}
+            >
+              <LogOut size={20} />
+              Sign Out
+            </motion.button>
+          </SignOutButton>
+        </TactileCard>
+      </motion.div>
     </div>
   );
 }
 
-function ProfileLink({ href, icon, label, desc }: { href: string; icon: React.ReactNode; label: string; desc: string }) {
+function StatItem({ value, label, color }: { value: number; label: string; color: string }) {
   return (
-    <Link href={href}>
-      <div className="w-full p-4 rounded-2xl bg-muted flex items-center gap-3 hover:bg-secondary transition-colors cursor-pointer">
-        <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent">
+    <div style={{ textAlign: "center" }}>
+      <div style={{ fontSize: 32, fontWeight: 700, color }}>{value}</div>
+      <div style={{ fontSize: 13, color: "#8a7b6d" }}>{label}</div>
+    </div>
+  );
+}
+
+function MenuLink({ href, icon, label, desc }: { href: string; icon: React.ReactNode; label: string; desc: string }) {
+  return (
+    <Link href={href} style={{ textDecoration: "none" }}>
+      <motion.div
+        whileTap={{ scale: 0.98, background: "#f5efe5" }}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 14,
+          padding: "14px 16px",
+          borderRadius: 12,
+        }}
+      >
+        <div 
+          style={{ 
+            color: "#8a7b6d",
+            width: 40,
+            height: 40,
+            background: "#f5efe5",
+            borderRadius: 12,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
           {icon}
         </div>
-        <div className="flex-1">
-          <p className="font-medium">{label}</p>
-          <p className="text-xs text-muted-foreground">{desc}</p>
+        <div style={{ flex: 1 }}>
+          <p style={{ fontSize: 16, fontWeight: 600, color: "#4a4035", margin: 0 }}>
+            {label}
+          </p>
+          <p style={{ fontSize: 13, color: "#8a7b6d", margin: 0 }}>
+            {desc}
+          </p>
         </div>
-        <ChevronRight className="w-5 h-5 text-muted-foreground" />
-      </div>
+        <ChevronRight size={20} style={{ color: "#c9bfb0" }} />
+      </motion.div>
     </Link>
   );
 }
