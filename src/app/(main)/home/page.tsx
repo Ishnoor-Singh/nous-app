@@ -33,11 +33,9 @@ export default function HomePage() {
   const todayCards = useQuery(api.knowledge.getTodayCards, {
     userId: userData?.user?._id || ("" as any),
   });
-  // TODO: Enable after running `npx convex dev` to push schema
-  // const habitProgress = useQuery(api.habits.getTodayProgress, {
-  //   userId: userData?.user?._id || ("" as any),
-  // });
-  const habitProgress = null as { _id: string; icon?: string; isCompletedToday: boolean }[] | null; // Temporary until schema pushed
+  const habitProgress = useQuery(api.habits.getTodayProgress, {
+    userId: userData?.user?._id || ("" as any),
+  });
   const generateCards = useMutation(api.knowledge.generateDailyCards);
   const syncUser = useMutation(api.users.syncUser);
 
