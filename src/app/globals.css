@@ -1,0 +1,193 @@
+@import "tailwindcss";
+
+@theme {
+  /* Warm, intellectual color palette */
+  --color-background: #faf8f5;
+  --color-foreground: #1a1a1b;
+  --color-muted: #f5f3f0;
+  --color-muted-foreground: #6b6966;
+  --color-accent: #6366f1;
+  --color-accent-foreground: #ffffff;
+  --color-secondary: #e8e5e0;
+  --color-secondary-foreground: #3d3b38;
+  
+  /* Emotional state colors */
+  --color-emotion-positive: #22c55e;
+  --color-emotion-negative: #ef4444;
+  --color-emotion-neutral: #a3a3a3;
+  --color-emotion-excited: #f59e0b;
+  --color-emotion-calm: #3b82f6;
+  --color-emotion-connected: #ec4899;
+  --color-emotion-curious: #8b5cf6;
+  
+  /* Topic colors */
+  --color-philosophy: #8b5cf6;
+  --color-history: #f59e0b;
+  --color-economics: #22c55e;
+  --color-art: #ec4899;
+  --color-psychology: #3b82f6;
+  
+  /* Fonts */
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  
+  /* Spacing */
+  --spacing-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --spacing-safe-top: env(safe-area-inset-top, 0px);
+}
+
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+  @theme {
+    --color-background: #0a0a0b;
+    --color-foreground: #f5f5f5;
+    --color-muted: #1a1a1b;
+    --color-muted-foreground: #a3a3a3;
+    --color-secondary: #2a2a2b;
+    --color-secondary-foreground: #e5e5e5;
+  }
+}
+
+/* Base styles */
+html {
+  scroll-behavior: smooth;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--color-background);
+  color: var(--color-foreground);
+  min-height: 100dvh;
+  overflow-x: hidden;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-muted-foreground);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-foreground);
+}
+
+/* PWA safe areas */
+.safe-top {
+  padding-top: var(--spacing-safe-top);
+}
+
+.safe-bottom {
+  padding-bottom: var(--spacing-safe-bottom);
+}
+
+/* Animations */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 20px 4px rgba(99, 102, 241, 0.2);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out forwards;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* Glassmorphism */
+.glass {
+  background: rgba(250, 248, 245, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+@media (prefers-color-scheme: dark) {
+  .glass {
+    background: rgba(26, 26, 27, 0.8);
+  }
+}
+
+/* Topic card gradients */
+.topic-philosophy {
+  background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%);
+}
+
+.topic-history {
+  background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+}
+
+.topic-economics {
+  background: linear-gradient(135deg, #22c55e 0%, #4ade80 100%);
+}
+
+.topic-art {
+  background: linear-gradient(135deg, #ec4899 0%, #f472b6 100%);
+}
+
+.topic-psychology {
+  background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+}
+
+/* Message bubbles */
+.message-user {
+  background: var(--color-accent);
+  color: var(--color-accent-foreground);
+  border-radius: 20px 20px 4px 20px;
+}
+
+.message-assistant {
+  background: var(--color-muted);
+  color: var(--color-foreground);
+  border-radius: 20px 20px 20px 4px;
+}
+
+/* Emotional state indicator */
+.emotion-ring {
+  --emotion-color: var(--color-emotion-neutral);
+  box-shadow: 0 0 0 3px var(--emotion-color);
+  transition: box-shadow 0.5s ease;
+}
+
+.emotion-positive { --emotion-color: var(--color-emotion-positive); }
+.emotion-negative { --emotion-color: var(--color-emotion-negative); }
+.emotion-excited { --emotion-color: var(--color-emotion-excited); }
+.emotion-calm { --emotion-color: var(--color-emotion-calm); }
+.emotion-connected { --emotion-color: var(--color-emotion-connected); }
+.emotion-curious { --emotion-color: var(--color-emotion-curious); }
