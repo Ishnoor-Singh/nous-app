@@ -199,6 +199,75 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_user_due", ["userId", "dueDate"]),
 
+  // Journal entries with AI assistance
+  journalEntries: defineTable({
+    userId: v.id("users"),
+    date: v.string(), // YYYY-MM-DD
+    // Entry content
+    prompt: v.optional(v.string()), // AI prompt that started this
+    content: v.string(), // User's journal entry
+    // AI analysis
+    mood: v.optional(v.string()), // detected mood
+    themes: v.optional(v.array(v.string())), // extracted themes
+    aiReflection: v.optional(v.string()), // Nous's thoughtful response
+    // Metadata
+    wordCount: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_date", ["userId", "date"]),
+
+  // Saved media (YouTube, articles, podcasts, etc.)
+  savedMedia: defineTable({
+    userId: v.id("users"),
+    // Source info
+    url: v.string(),
+    type: v.union(
+      v.literal("youtube"),
+      v.literal("article"),
+      v.literal("podcast"),
+      v.literal("tweet"),
+      v.literal("book"),
+      v.literal("other"),
+    ),
+    title: v.string(),
+    author: v.optional(v.string()),
+    thumbnail: v.optional(v.string()),
+    duration: v.optional(v.string()), // for videos/podcasts
+    // AI-generated content
+    summary: v.optional(v.string()), // AI summary
+    keyPoints: v.optional(v.array(v.string())), // bullet points
+    transcript: v.optional(v.string()), // full transcript if available
+    notes: v.optional(v.string()), // AI-generated notes
+    // User additions
+    userNotes: v.optional(v.string()),
+    highlights: v.optional(v.array(v.object({
+      text: v.string(),
+      note: v.optional(v.string()),
+      timestamp: v.optional(v.string()), // for video timestamps
+    }))),
+    // Organization
+    tags: v.optional(v.array(v.string())),
+    category: v.optional(v.string()),
+    // Reading/watch status
+    status: v.union(
+      v.literal("inbox"),
+      v.literal("processing"),
+      v.literal("ready"),
+      v.literal("archived"),
+    ),
+    // Metadata
+    savedAt: v.number(),
+    processedAt: v.optional(v.number()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_status", ["userId", "status"])
+    .searchIndex("search_content", {
+      searchField: "title",
+      filterFields: ["userId", "type", "status"],
+    }),
+
   // Daily check-in summaries
   dailyCheckIns: defineTable({
     userId: v.id("users"),

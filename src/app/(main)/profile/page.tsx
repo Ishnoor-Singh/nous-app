@@ -7,7 +7,7 @@ import { motion } from "framer-motion";
 import { 
   User, Flame, Brain, Settings, 
   LogOut, Trophy, BookOpen, Map,
-  Swords, ChevronRight
+  Swords, ChevronRight, PenLine, Inbox
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -132,6 +132,8 @@ export default function ProfilePage() {
       >
         <h2 className="text-lg font-semibold mb-4">More</h2>
         <div className="space-y-2">
+          <ProfileLink href="/journal" icon={<PenLine />} label="Journal" desc="AI-assisted reflection" />
+          <ProfileLink href="/inbox" icon={<Inbox />} label="Inbox" desc="Saved media & notes" />
           <ProfileLink href="/challenge" icon={<Swords />} label="Daily Challenge" desc="Test your knowledge" />
           <ProfileLink href="/achievements" icon={<Trophy />} label="Achievements" desc="Your milestones" />
           <ProfileLink href="/library" icon={<BookOpen />} label="Library" desc="Topics & history" />
