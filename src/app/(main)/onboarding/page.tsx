@@ -6,16 +6,14 @@ import { api } from "../../../../convex/_generated/api";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  Brain, Heart, Sparkles, BookOpen, 
-  ArrowRight, Check, Star
-} from "lucide-react";
+import { ArrowRight, Check, Sparkles } from "lucide-react";
+import { CreatureCharacter, CreatureSelector, CREATURES, type CreatureId } from "@/components/creature/CreatureCharacter";
 
 const STEPS = [
   { id: "welcome", component: WelcomeStep },
+  { id: "creature", component: CreatureStep },
   { id: "name", component: NameStep },
   { id: "interests", component: InterestsStep },
-  { id: "style", component: StyleStep },
   { id: "ready", component: ReadyStep },
 ];
 
@@ -26,7 +24,8 @@ export default function OnboardingPage() {
   const [data, setData] = useState({
     preferredName: "",
     interests: [] as string[],
-    learningStyle: "",
+    learningStyle: "narrative",
+    creatureId: null as CreatureId | null,
   });
 
   const userData = useQuery(api.users.getUserWithState, {
@@ -40,12 +39,12 @@ export default function OnboardingPage() {
   }, [userData, router]);
 
   const updateData = (key: string, value: any) => {
-    setData(prev => ({ ...prev, [key]: value }));
+    setData((prev) => ({ ...prev, [key]: value }));
   };
 
   const nextStep = () => {
     if (currentStep < STEPS.length - 1) {
-      setCurrentStep(prev => prev + 1);
+      setCurrentStep((prev) => prev + 1);
     }
   };
 
@@ -61,12 +60,11 @@ export default function OnboardingPage() {
             initial={false}
             animate={{
               width: index === currentStep ? 28 : 10,
-              background: index <= currentStep 
-                ? "linear-gradient(135deg, #6366f1 0%, #a78bfa 100%)" 
-                : "rgba(255, 255, 255, 0.1)",
-              boxShadow: index <= currentStep 
-                ? "0 0 10px rgba(99, 102, 241, 0.5)" 
-                : "none",
+              background:
+                index <= currentStep
+                  ? "linear-gradient(135deg, #6366f1 0%, #a78bfa 100%)"
+                  : "rgba(255, 255, 255, 0.1)",
+              boxShadow: index <= currentStep ? "0 0 10px rgba(99, 102, 241, 0.5)" : "none",
             }}
             className="h-2.5 rounded-full"
           />
@@ -84,13 +82,7 @@ export default function OnboardingPage() {
             transition={{ duration: 0.3 }}
             className="flex-1 flex flex-col"
           >
-            <CurrentStepComponent 
-              data={data} 
-              updateData={updateData} 
-              onNext={nextStep}
-              user={user}
-              userData={userData}
-            />
+            <CurrentStepComponent data={data} updateData={updateData} onNext={nextStep} user={user} userData={userData} />
           </motion.div>
         </AnimatePresence>
       </div>
@@ -98,26 +90,46 @@ export default function OnboardingPage() {
   );
 }
 
-function WelcomeStep({ onNext }: any) {
+function WelcomeStep({ onNext, data }: any) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center text-center">
+      {/* Floating creatures preview */}
       <motion.div
         initial={{ scale: 0.8, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ delay: 0.2 }}
-        className="w-28 h-28 rounded-3xl bg-gradient-to-br from-accent to-purple-600 flex items-center justify-center mb-8 glow-accent"
-        style={{ boxShadow: "0 0 50px rgba(99, 102, 241, 0.4)" }}
+        className="mb-8 relative"
       >
-        <Brain className="w-14 h-14 text-white" />
+        <motion.div
+          animate={{ y: [0, -10, 0], rotate: [-5, 5, -5] }}
+          transition={{ duration: 3, repeat: Infinity }}
+          className="absolute -left-16 top-0"
+        >
+          <CreatureCharacter creatureId="glob" mood="happy" size={60} />
+        </motion.div>
+        <motion.div
+          animate={{ y: [0, -15, 0] }}
+          transition={{ duration: 2.5, repeat: Infinity }}
+        >
+          <CreatureCharacter creatureId="puff" mood="excited" size={100} />
+        </motion.div>
+        <motion.div
+          animate={{ y: [0, -8, 0], rotate: [5, -5, 5] }}
+          transition={{ duration: 3.5, repeat: Infinity }}
+          className="absolute -right-16 top-4"
+        >
+          <CreatureCharacter creatureId="jello" mood="happy" size={55} />
+        </motion.div>
       </motion.div>
 
       <motion.h1
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.3 }}
-        className="text-4xl font-bold text-white mb-4 text-glow"
+        className="text-4xl font-bold text-white mb-4"
+        style={{ textShadow: "0 0 30px rgba(255,255,255,0.3)" }}
       >
-        Hello, I'm Nous
+        Meet Your New Friend
       </motion.h1>
 
       <motion.div
@@ -126,9 +138,9 @@ function WelcomeStep({ onNext }: any) {
         transition={{ delay: 0.4 }}
         className="space-y-4 text-white/60 max-w-xs"
       >
-        <p>I'm not a chatbot, and I won't pretend to be human.</p>
-        <p>I'm something different — a companion that learns with you, remembers what matters, and grows over time.</p>
-        <p className="text-white/80">Let me get to know you.</p>
+        <p>Choose a pocket creature to be your learning companion.</p>
+        <p>They'll help you explore philosophy, history, economics, art, and psychology.</p>
+        <p className="text-white/80">Your very own knowledge buddy! ✨</p>
       </motion.div>
 
       <motion.button
@@ -138,10 +150,75 @@ function WelcomeStep({ onNext }: any) {
         onClick={onNext}
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
-        className="mt-12 px-8 py-4 bg-gradient-to-r from-accent to-purple-600 text-white rounded-2xl font-semibold flex items-center gap-2 glow-accent"
+        className="mt-12 px-8 py-4 bg-gradient-to-r from-accent to-purple-600 text-white rounded-2xl font-semibold flex items-center gap-2"
+        style={{ boxShadow: "0 0 30px rgba(99, 102, 241, 0.4)" }}
       >
-        Let's begin
+        Let's go!
         <ArrowRight className="w-5 h-5" />
+      </motion.button>
+    </div>
+  );
+}
+
+function CreatureStep({ data, updateData, onNext }: any) {
+  const [selected, setSelected] = useState<CreatureId | null>(data.creatureId);
+
+  const handleContinue = () => {
+    updateData("creatureId", selected);
+    onNext();
+  };
+
+  return (
+    <div className="flex-1 flex flex-col">
+      <div className="text-center mb-6">
+        <h2 className="text-3xl font-bold text-white mb-2">Choose Your Buddy</h2>
+        <p className="text-white/50">Who do you want to learn with?</p>
+      </div>
+
+      {/* Selected creature preview */}
+      <div className="flex justify-center mb-6">
+        <motion.div
+          animate={{ y: [0, -10, 0] }}
+          transition={{ duration: 2, repeat: Infinity }}
+          className="h-32"
+        >
+          {selected ? (
+            <CreatureCharacter creatureId={selected} mood="excited" size={120} />
+          ) : (
+            <div className="w-[120px] h-[132px] rounded-full flex items-center justify-center"
+              style={{ background: "rgba(255,255,255,0.05)", border: "2px dashed rgba(255,255,255,0.2)" }}>
+              <span className="text-white/30 text-4xl">?</span>
+            </div>
+          )}
+        </motion.div>
+      </div>
+
+      {selected && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center mb-4"
+        >
+          <h3 className="text-xl font-semibold text-white">{CREATURES[selected].name}</h3>
+          <p className="text-white/50 text-sm">{CREATURES[selected].personality}</p>
+        </motion.div>
+      )}
+
+      {/* Creature grid */}
+      <div className="flex-1 overflow-y-auto -mx-2 px-2">
+        <CreatureSelector selectedId={selected} onSelect={setSelected} />
+      </div>
+
+      <motion.button
+        onClick={handleContinue}
+        disabled={!selected}
+        whileHover={{ scale: selected ? 1.02 : 1 }}
+        whileTap={{ scale: selected ? 0.98 : 1 }}
+        className="mt-4 w-full py-4 bg-gradient-to-r from-accent to-purple-600 text-white rounded-2xl font-semibold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        style={{ boxShadow: selected ? "0 0 20px rgba(99, 102, 241, 0.3)" : "none" }}
+      >
+        This is my buddy!
+        <Sparkles className="w-5 h-5" />
       </motion.button>
     </div>
   );
@@ -149,6 +226,7 @@ function WelcomeStep({ onNext }: any) {
 
 function NameStep({ data, updateData, onNext, user }: any) {
   const [name, setName] = useState(data.preferredName || user?.firstName || "");
+  const creature = data.creatureId ? CREATURES[data.creatureId as CreatureId] : null;
 
   const handleContinue = () => {
     updateData("preferredName", name);
@@ -158,24 +236,37 @@ function NameStep({ data, updateData, onNext, user }: any) {
   return (
     <div className="flex-1 flex flex-col">
       <div className="flex-1 flex flex-col items-center justify-center">
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          className="w-20 h-20 rounded-full bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center mb-8"
-          style={{ boxShadow: "0 0 40px rgba(236, 72, 153, 0.4)" }}
-        >
-          <Heart className="w-10 h-10 text-white" />
-        </motion.div>
+        {data.creatureId && (
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            className="mb-6"
+          >
+            <CreatureCharacter
+              creatureId={data.creatureId}
+              mood="curious"
+              size={100}
+              message="What's your name?"
+              showMessage={true}
+            />
+          </motion.div>
+        )}
 
-        <h2 className="text-3xl font-bold text-white mb-2">What should I call you?</h2>
-        <p className="text-white/50 mb-8">I'll remember this.</p>
+        <h2 className="text-3xl font-bold text-white mb-2 text-center">
+          {creature?.name} wants to know...
+        </h2>
+        <p className="text-white/50 mb-8 text-center">What should they call you?</p>
 
         <input
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Your name"
-          className="w-full max-w-xs p-4 text-xl text-center glass-input rounded-2xl text-white"
+          className="w-full max-w-xs p-4 text-xl text-center rounded-2xl text-white bg-transparent"
+          style={{
+            background: "rgba(255,255,255,0.05)",
+            border: "1px solid rgba(255,255,255,0.1)",
+          }}
           autoFocus
         />
       </div>
@@ -185,7 +276,8 @@ function NameStep({ data, updateData, onNext, user }: any) {
         disabled={!name.trim()}
         whileHover={{ scale: name.trim() ? 1.02 : 1 }}
         whileTap={{ scale: name.trim() ? 0.98 : 1 }}
-        className="w-full py-4 bg-gradient-to-r from-accent to-purple-600 text-white rounded-2xl font-semibold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed glow-accent"
+        className="w-full py-4 bg-gradient-to-r from-accent to-purple-600 text-white rounded-2xl font-semibold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        style={{ boxShadow: name.trim() ? "0 0 20px rgba(99, 102, 241, 0.3)" : "none" }}
       >
         Continue
         <ArrowRight className="w-5 h-5" />
@@ -198,17 +290,15 @@ function InterestsStep({ data, updateData, onNext }: any) {
   const [selected, setSelected] = useState<string[]>(data.interests || []);
 
   const topics = [
-    { id: "philosophy", label: "Philosophy", icon: "🤔", desc: "Meaning, ethics, existence", color: "from-purple-500/30 to-violet-500/30 border-purple-500/40" },
-    { id: "history", label: "History", icon: "📜", desc: "Patterns across time", color: "from-amber-500/30 to-yellow-500/30 border-amber-500/40" },
-    { id: "economics", label: "Economics", icon: "📈", desc: "Incentives & systems", color: "from-green-500/30 to-emerald-500/30 border-green-500/40" },
-    { id: "art", label: "Art", icon: "🎨", desc: "Beauty & expression", color: "from-pink-500/30 to-rose-500/30 border-pink-500/40" },
-    { id: "psychology", label: "Psychology", icon: "🧠", desc: "Mind & behavior", color: "from-blue-500/30 to-cyan-500/30 border-blue-500/40" },
+    { id: "philosophy", label: "Philosophy", icon: "🤔", color: "from-purple-500/30 to-violet-500/30" },
+    { id: "history", label: "History", icon: "📜", color: "from-amber-500/30 to-yellow-500/30" },
+    { id: "economics", label: "Economics", icon: "📈", color: "from-green-500/30 to-emerald-500/30" },
+    { id: "art", label: "Art", icon: "🎨", color: "from-pink-500/30 to-rose-500/30" },
+    { id: "psychology", label: "Psychology", icon: "🧠", color: "from-blue-500/30 to-cyan-500/30" },
   ];
 
   const toggle = (id: string) => {
-    setSelected(prev => 
-      prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]
-    );
+    setSelected((prev) => (prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]));
   };
 
   const handleContinue = () => {
@@ -218,22 +308,20 @@ function InterestsStep({ data, updateData, onNext }: any) {
 
   return (
     <div className="flex-1 flex flex-col">
-      <div className="flex-1">
-        <div className="text-center mb-8">
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center mb-4"
-            style={{ boxShadow: "0 0 40px rgba(245, 158, 11, 0.4)" }}
-          >
-            <Sparkles className="w-10 h-10 text-white" />
+      <div className="text-center mb-6">
+        {data.creatureId && (
+          <motion.div animate={{ y: [0, -8, 0] }} transition={{ duration: 2, repeat: Infinity }} className="mb-4">
+            <CreatureCharacter creatureId={data.creatureId} mood={selected.length > 0 ? "excited" : "curious"} size={80} />
           </motion.div>
-          <h2 className="text-3xl font-bold text-white mb-2">What fascinates you?</h2>
-          <p className="text-white/50">Pick what you're curious about.</p>
-        </div>
+        )}
+        <h2 className="text-3xl font-bold text-white mb-2">What fascinates you?</h2>
+        <p className="text-white/50">Pick what you want to explore together</p>
+      </div>
 
-        <div className="space-y-3">
-          {topics.map((topic, index) => (
+      <div className="flex-1 space-y-3">
+        {topics.map((topic, index) => {
+          const isSelected = selected.includes(topic.id);
+          return (
             <motion.button
               key={topic.id}
               initial={{ opacity: 0, x: -20 }}
@@ -242,18 +330,17 @@ function InterestsStep({ data, updateData, onNext }: any) {
               onClick={() => toggle(topic.id)}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className={`w-full p-4 rounded-2xl flex items-center gap-4 transition-all glass-card bg-gradient-to-r ${
-                selected.includes(topic.id)
-                  ? topic.color + " glow-accent"
-                  : "from-white/5 to-white/10 border-white/10"
+              className={`w-full p-4 rounded-2xl flex items-center gap-4 transition-all bg-gradient-to-r ${
+                isSelected ? topic.color : "from-white/5 to-white/10"
               }`}
+              style={{
+                border: isSelected ? "1px solid rgba(255,255,255,0.3)" : "1px solid rgba(255,255,255,0.1)",
+                boxShadow: isSelected ? "0 0 20px rgba(255,255,255,0.1)" : "none",
+              }}
             >
               <span className="text-3xl">{topic.icon}</span>
-              <div className="flex-1 text-left">
-                <p className="font-semibold text-white">{topic.label}</p>
-                <p className="text-sm text-white/50">{topic.desc}</p>
-              </div>
-              {selected.includes(topic.id) && (
+              <span className="font-semibold text-white flex-1 text-left">{topic.label}</span>
+              {isSelected && (
                 <motion.div
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
@@ -263,8 +350,8 @@ function InterestsStep({ data, updateData, onNext }: any) {
                 </motion.div>
               )}
             </motion.button>
-          ))}
-        </div>
+          );
+        })}
       </div>
 
       <motion.button
@@ -272,89 +359,10 @@ function InterestsStep({ data, updateData, onNext }: any) {
         disabled={selected.length === 0}
         whileHover={{ scale: selected.length > 0 ? 1.02 : 1 }}
         whileTap={{ scale: selected.length > 0 ? 0.98 : 1 }}
-        className="w-full py-4 bg-gradient-to-r from-accent to-purple-600 text-white rounded-2xl font-semibold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed glow-accent mt-4"
+        className="mt-4 w-full py-4 bg-gradient-to-r from-accent to-purple-600 text-white rounded-2xl font-semibold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        style={{ boxShadow: selected.length > 0 ? "0 0 20px rgba(99, 102, 241, 0.3)" : "none" }}
       >
-        Continue
-        <ArrowRight className="w-5 h-5" />
-      </motion.button>
-    </div>
-  );
-}
-
-function StyleStep({ data, updateData, onNext }: any) {
-  const [selected, setSelected] = useState(data.learningStyle || "");
-
-  const styles = [
-    { id: "socratic", label: "Question Me", icon: "❓", desc: "Learn through questions that make you think" },
-    { id: "narrative", label: "Tell Stories", icon: "📖", desc: "Learn through engaging narratives" },
-    { id: "analytical", label: "Show Logic", icon: "🔬", desc: "Learn through systematic analysis" },
-    { id: "visual", label: "Give Examples", icon: "💡", desc: "Learn through concrete examples" },
-  ];
-
-  const handleContinue = () => {
-    updateData("learningStyle", selected);
-    onNext();
-  };
-
-  return (
-    <div className="flex-1 flex flex-col">
-      <div className="flex-1">
-        <div className="text-center mb-8">
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center mb-4"
-            style={{ boxShadow: "0 0 40px rgba(34, 197, 94, 0.4)" }}
-          >
-            <BookOpen className="w-10 h-10 text-white" />
-          </motion.div>
-          <h2 className="text-3xl font-bold text-white mb-2">How do you learn best?</h2>
-          <p className="text-white/50">I'll adapt to your style.</p>
-        </div>
-
-        <div className="space-y-3">
-          {styles.map((style, index) => (
-            <motion.button
-              key={style.id}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.1 }}
-              onClick={() => setSelected(style.id)}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className={`w-full p-4 rounded-2xl flex items-center gap-4 transition-all glass-card ${
-                selected === style.id
-                  ? "glass-accent glow-accent"
-                  : ""
-              }`}
-            >
-              <span className="text-3xl">{style.icon}</span>
-              <div className="flex-1 text-left">
-                <p className="font-semibold text-white">{style.label}</p>
-                <p className="text-sm text-white/50">{style.desc}</p>
-              </div>
-              {selected === style.id && (
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  className="w-7 h-7 rounded-full bg-gradient-to-r from-accent to-purple-600 flex items-center justify-center"
-                >
-                  <Check className="w-4 h-4 text-white" />
-                </motion.div>
-              )}
-            </motion.button>
-          ))}
-        </div>
-      </div>
-
-      <motion.button
-        onClick={handleContinue}
-        disabled={!selected}
-        whileHover={{ scale: selected ? 1.02 : 1 }}
-        whileTap={{ scale: selected ? 0.98 : 1 }}
-        className="w-full py-4 bg-gradient-to-r from-accent to-purple-600 text-white rounded-2xl font-semibold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed glow-accent mt-4"
-      >
-        Continue
+        Let's explore!
         <ArrowRight className="w-5 h-5" />
       </motion.button>
     </div>
@@ -366,15 +374,16 @@ function ReadyStep({ data, userData }: any) {
   const [isReady, setIsReady] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const completeOnboarding = useMutation(api.users.completeOnboarding);
+  const creature = data.creatureId ? CREATURES[data.creatureId as CreatureId] : null;
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsReady(true), 1500);
+    const timer = setTimeout(() => setIsReady(true), 1000);
     return () => clearTimeout(timer);
   }, []);
 
   const handleStart = async () => {
     if (!userData?.user?._id || isSaving) return;
-    
+
     setIsSaving(true);
     try {
       await completeOnboarding({
@@ -394,32 +403,47 @@ function ReadyStep({ data, userData }: any) {
     <div className="flex-1 flex flex-col items-center justify-center text-center">
       <motion.div
         initial={{ scale: 0 }}
-        animate={{ scale: 1, rotate: [0, 10, -10, 0] }}
-        transition={{ duration: 0.5, delay: 0.2 }}
-        className="w-28 h-28 rounded-3xl bg-gradient-to-br from-accent to-purple-600 flex items-center justify-center mb-8"
-        style={{ boxShadow: "0 0 60px rgba(99, 102, 241, 0.5)" }}
+        animate={{ scale: 1 }}
+        transition={{ type: "spring", delay: 0.2 }}
+        className="mb-8"
       >
-        <Star className="w-14 h-14 text-white" />
+        {data.creatureId && (
+          <motion.div
+            animate={{ y: [0, -15, 0], rotate: [-3, 3, -3] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          >
+            <CreatureCharacter
+              creatureId={data.creatureId}
+              mood="excited"
+              size={140}
+              message={`Let's go, ${data.preferredName}!`}
+              showMessage={true}
+            />
+          </motion.div>
+        )}
       </motion.div>
 
       <motion.h1
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.4 }}
-        className="text-4xl font-bold text-white mb-4 text-glow"
+        className="text-4xl font-bold text-white mb-4"
+        style={{ textShadow: "0 0 30px rgba(255,255,255,0.3)" }}
       >
-        Nice to meet you, {data.preferredName}
+        You & {creature?.name}
       </motion.h1>
 
       <motion.div
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.5 }}
-        className="space-y-4 text-white/60 max-w-xs mb-8"
+        className="space-y-3 text-white/60 max-w-xs mb-8"
       >
-        <p>I'm excited to explore {data.interests?.join(", ")} with you.</p>
-        <p>I'll remember your preferences and grow with every conversation.</p>
-        <p className="text-white font-medium">Let's start learning.</p>
+        <p>
+          {creature?.name} is excited to explore{" "}
+          <span className="text-white">{data.interests?.join(", ")}</span> with you!
+        </p>
+        <p className="text-white">Your pocket buddy is ready ✨</p>
       </motion.div>
 
       <AnimatePresence>
@@ -430,9 +454,10 @@ function ReadyStep({ data, userData }: any) {
             onClick={handleStart}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="px-10 py-5 bg-gradient-to-r from-accent to-purple-600 text-white rounded-2xl font-semibold flex items-center gap-3 animate-pulse-glow"
+            className="px-10 py-5 bg-gradient-to-r from-accent to-purple-600 text-white rounded-2xl font-semibold flex items-center gap-3"
+            style={{ boxShadow: "0 0 40px rgba(99, 102, 241, 0.5)" }}
           >
-            {isSaving ? "Setting up..." : "Begin your journey"}
+            {isSaving ? "Setting up..." : "Start our adventure!"}
             <Sparkles className="w-5 h-5" />
           </motion.button>
         )}

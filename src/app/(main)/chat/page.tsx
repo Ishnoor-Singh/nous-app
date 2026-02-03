@@ -5,8 +5,9 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Brain, Sparkles, Loader2, Video } from "lucide-react";
+import { Send, Sparkles, Loader2 } from "lucide-react";
 import { Id } from "../../../../convex/_generated/dataModel";
+import { CreatureCharacter, CREATURES, type CreatureId, type MoodType } from "@/components/creature/CreatureCharacter";
 
 export default function ChatPage() {
   const { user } = useUser();
@@ -24,8 +25,15 @@ export default function ChatPage() {
 
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [creatureMood, setCreatureMood] = useState<MoodType>("idle");
+  const [creatureMessage, setCreatureMessage] = useState("");
+  const [showCreatureMessage, setShowCreatureMessage] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Default creature - in future, get from user preferences
+  const creatureId: CreatureId = "puff";
+  const creature = CREATURES[creatureId];
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -35,29 +43,46 @@ export default function ChatPage() {
     scrollToBottom();
   }, [conversationData?.messages]);
 
+  // Creature greets on mount
+  useEffect(() => {
+    const greetings = [
+      "Hi there! 💕",
+      "Ready to learn!",
+      "What's up?",
+      "Hiii~",
+    ];
+    setTimeout(() => {
+      setCreatureMessage(greetings[Math.floor(Math.random() * greetings.length)]);
+      setShowCreatureMessage(true);
+      setCreatureMood("happy");
+      setTimeout(() => {
+        setShowCreatureMessage(false);
+        setCreatureMood("idle");
+      }, 2000);
+    }, 500);
+  }, []);
+
   const handleSend = async () => {
     if (!input.trim() || !userData?.user || isLoading) return;
 
     const messageText = input.trim();
     setInput("");
     setIsLoading(true);
+    setCreatureMood("thinking");
 
     try {
-      // Create conversation if needed
       let convId = activeConversationId;
       if (!convId) {
         convId = await createConversation({ userId: userData.user._id });
         setActiveConversationId(convId);
       }
 
-      // Add user message
       await addMessage({
         conversationId: convId,
         role: "user",
         content: messageText,
       });
 
-      // Get AI response
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -72,7 +97,11 @@ export default function ChatPage() {
 
       const data = await response.json();
 
-      // Add AI response
+      // Creature reacts
+      setCreatureMood("talking");
+      setCreatureMessage("Ooh!");
+      setShowCreatureMessage(true);
+
       await addMessage({
         conversationId: convId,
         role: "assistant",
@@ -86,7 +115,12 @@ export default function ChatPage() {
         } : undefined,
       });
 
-      // Log emotional response if provided
+      setTimeout(() => {
+        setShowCreatureMessage(false);
+        setCreatureMood("happy");
+        setTimeout(() => setCreatureMood("idle"), 1500);
+      }, 1000);
+
       if (data.emotion) {
         await logEmotion({
           userId: userData.user._id,
@@ -97,6 +131,7 @@ export default function ChatPage() {
       }
     } catch (error) {
       console.error("Failed to send message:", error);
+      setCreatureMood("idle");
     } finally {
       setIsLoading(false);
     }
@@ -112,28 +147,50 @@ export default function ChatPage() {
   const messages = conversationData?.messages || [];
 
   return (
-    <main className="min-h-dvh flex flex-col safe-top">
+    <main className="min-h-dvh flex flex-col safe-top relative">
+      {/* Creature floating in corner */}
+      <motion.div
+        className="fixed top-20 right-4 z-20"
+        animate={{ y: [0, -8, 0] }}
+        transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+      >
+        <CreatureCharacter
+          creatureId={creatureId}
+          mood={creatureMood}
+          size={80}
+          message={creatureMessage}
+          showMessage={showCreatureMessage}
+          onClick={() => {
+            setCreatureMessage("Whatcha thinking?");
+            setShowCreatureMessage(true);
+            setCreatureMood("curious");
+            setTimeout(() => {
+              setShowCreatureMessage(false);
+              setCreatureMood("idle");
+            }, 2000);
+          }}
+        />
+      </motion.div>
+
       {/* Header */}
-      <header className="p-4 glass-nav sticky top-0 z-10">
+      <header
+        className="p-4 sticky top-0 z-10"
+        style={{
+          background: "rgba(15, 15, 26, 0.9)",
+          backdropFilter: "blur(20px)",
+          borderBottom: "1px solid rgba(255,255,255,0.08)",
+        }}
+      >
         <div className="flex items-center gap-3">
-          <motion.div 
-            animate={{ 
-              boxShadow: [
-                "0 0 15px rgba(99, 102, 241, 0.3)",
-                "0 0 25px rgba(99, 102, 241, 0.5)",
-                "0 0 15px rgba(99, 102, 241, 0.3)",
-              ]
-            }}
-            transition={{ duration: 2, repeat: Infinity }}
-            className="w-12 h-12 rounded-full bg-gradient-to-br from-accent to-purple-600 flex items-center justify-center"
+          <div
+            className="w-10 h-10 rounded-full flex items-center justify-center"
+            style={{ background: creature.bodyColor }}
           >
-            <Brain className="w-6 h-6 text-white" />
-          </motion.div>
+            <span className="text-lg">✨</span>
+          </div>
           <div>
-            <h1 className="font-semibold text-white text-lg">Nous</h1>
-            <p className="text-xs text-white/50">
-              {userData?.emotionalState ? getMoodText(userData.emotionalState) : "Your thinking partner"}
-            </p>
+            <h1 className="font-semibold text-white text-lg">{creature.name}</h1>
+            <p className="text-xs text-white/50">{creature.personality}</p>
           </div>
         </div>
       </header>
@@ -144,29 +201,36 @@ export default function ChatPage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center py-12"
+            className="text-center py-8"
           >
-            <motion.div 
-              animate={{ 
-                scale: [1, 1.05, 1],
-                boxShadow: [
-                  "0 0 30px rgba(99, 102, 241, 0.2)",
-                  "0 0 50px rgba(99, 102, 241, 0.4)",
-                  "0 0 30px rgba(99, 102, 241, 0.2)",
-                ]
-              }}
-              transition={{ duration: 3, repeat: Infinity }}
-              className="w-24 h-24 mx-auto mb-6 rounded-full glass-accent flex items-center justify-center"
+            <motion.div
+              animate={{ y: [0, -10, 0] }}
+              transition={{ duration: 2, repeat: Infinity }}
+              className="mb-6"
             >
-              <Sparkles className="w-12 h-12 text-accent" />
+              <CreatureCharacter creatureId={creatureId} mood="excited" size={140} />
             </motion.div>
-            <h2 className="text-2xl font-bold text-white mb-3">Let's explore together</h2>
-            <p className="text-white/50 max-w-xs mx-auto mb-6">
-              Ask about philosophy, history, economics, art, or psychology. I'll help you understand deeply.
+            <h2 className="text-2xl font-bold text-white mb-3">
+              Hey, I'm {creature.name}!
+            </h2>
+            <p className="text-white/50 max-w-xs mx-auto mb-4">
+              {creature.personality}. Ask me anything about philosophy, history, 
+              economics, art, or psychology!
             </p>
-            <div className="flex items-center justify-center gap-2 text-sm text-white/40">
-              <Video className="w-4 h-4" />
-              <span>You can also share YouTube videos!</span>
+            <div className="flex flex-wrap justify-center gap-2">
+              {["What's stoicism?", "Tell me about art", "How does money work?"].map((q) => (
+                <button
+                  key={q}
+                  onClick={() => setInput(q)}
+                  className="px-3 py-1.5 rounded-full text-sm text-white/70 hover:text-white transition-colors"
+                  style={{
+                    background: "rgba(255,255,255,0.08)",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                  }}
+                >
+                  {q}
+                </button>
+              ))}
             </div>
           </motion.div>
         )}
@@ -181,29 +245,48 @@ export default function ChatPage() {
               transition={{ delay: index * 0.02 }}
               className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
             >
+              {message.role === "assistant" && (
+                <div className="mr-2 mt-1">
+                  <CreatureCharacter creatureId={creatureId} mood="happy" size={32} />
+                </div>
+              )}
               <div
-                className={`max-w-[85%] p-4 ${
-                  message.role === "user" ? "message-user" : "message-assistant"
+                className={`max-w-[80%] p-4 rounded-2xl ${
+                  message.role === "user"
+                    ? "bg-gradient-to-r from-accent to-purple-600 text-white rounded-br-sm"
+                    : "rounded-bl-sm"
                 }`}
+                style={
+                  message.role === "assistant"
+                    ? {
+                        background: "rgba(255,255,255,0.08)",
+                        border: "1px solid rgba(255,255,255,0.1)",
+                      }
+                    : {}
+                }
               >
-                <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                <p className="whitespace-pre-wrap leading-relaxed text-white">
+                  {message.content}
+                </p>
               </div>
             </motion.div>
           ))}
         </AnimatePresence>
 
         {isLoading && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="flex justify-start"
-          >
-            <div className="message-assistant p-4 flex items-center gap-3">
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-              >
-                <Loader2 className="w-5 h-5 text-accent" />
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
+            <div className="mr-2 mt-1">
+              <CreatureCharacter creatureId={creatureId} mood="thinking" size={32} />
+            </div>
+            <div
+              className="p-4 rounded-2xl rounded-bl-sm flex items-center gap-3"
+              style={{
+                background: "rgba(255,255,255,0.08)",
+                border: "1px solid rgba(255,255,255,0.1)",
+              }}
+            >
+              <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }}>
+                <Loader2 className="w-5 h-5 text-white/50" />
               </motion.div>
               <span className="text-white/50">Thinking...</span>
             </div>
@@ -214,21 +297,33 @@ export default function ChatPage() {
       </div>
 
       {/* Input */}
-      <div className="p-4 glass-nav">
+      <div
+        className="p-4"
+        style={{
+          background: "rgba(15, 15, 26, 0.9)",
+          backdropFilter: "blur(20px)",
+          borderTop: "1px solid rgba(255,255,255,0.08)",
+        }}
+      >
         <div className="flex items-end gap-3">
-          <div className="flex-1 glass-input rounded-2xl">
+          <div
+            className="flex-1 rounded-2xl"
+            style={{
+              background: "rgba(255,255,255,0.05)",
+              border: "1px solid rgba(255,255,255,0.1)",
+            }}
+          >
             <textarea
               ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask something or paste a YouTube link..."
+              onFocus={() => setCreatureMood("curious")}
+              onBlur={() => !isLoading && setCreatureMood("idle")}
+              placeholder={`Ask ${creature.name} anything...`}
               rows={1}
               className="w-full p-4 bg-transparent resize-none focus:outline-none max-h-32 text-white placeholder:text-white/40"
-              style={{ 
-                height: "auto",
-                minHeight: "56px",
-              }}
+              style={{ height: "auto", minHeight: "56px" }}
             />
           </div>
           <motion.button
@@ -236,7 +331,8 @@ export default function ChatPage() {
             disabled={!input.trim() || isLoading}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="w-14 h-14 rounded-2xl bg-gradient-to-r from-accent to-purple-600 text-white flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed glow-accent transition-all"
+            className="w-14 h-14 rounded-2xl bg-gradient-to-r from-accent to-purple-600 text-white flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ boxShadow: "0 0 20px rgba(99, 102, 241, 0.3)" }}
           >
             <Send className="w-5 h-5" />
           </motion.button>
@@ -244,12 +340,4 @@ export default function ChatPage() {
       </div>
     </main>
   );
-}
-
-function getMoodText(state: any): string {
-  if (state.curiosity > 0.6) return "Curious to learn more ✨";
-  if (state.connection > 0.6) return "Feeling connected 💜";
-  if (state.valence > 0.3) return "In a good mood 😊";
-  if (state.arousal > 0.6) return "Energized ⚡";
-  return "Here for you";
 }
