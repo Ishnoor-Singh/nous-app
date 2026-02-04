@@ -9,7 +9,14 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+// Lazy initialization to avoid build-time errors
+let convex: ConvexHttpClient | null = null;
+function getConvex() {
+  if (!convex) {
+    convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+  }
+  return convex;
+}
 
 // Supadata API for video transcripts
 const SUPADATA_API_KEY = process.env.SUPADATA_API_KEY || "sd_f05cfbfebf323d56da8a9b1b2ea92869";
@@ -407,12 +414,12 @@ async function executeToolCall(
 
     switch (name) {
       case "get_habits": {
-        const data = await convex.query(api.habits.getSummaryForAI, { userId: userIdTyped });
+        const data = await getConvex().query(api.habits.getSummaryForAI, { userId: userIdTyped });
         return JSON.stringify(data);
       }
 
       case "create_habit": {
-        const habitId = await convex.mutation(api.habits.createHabit, {
+        const habitId = await getConvex().mutation(api.habits.createHabit, {
           userId: userIdTyped,
           name: args.name,
           description: args.description,
@@ -428,7 +435,7 @@ async function executeToolCall(
 
       case "log_habit": {
         // Find habit by name first
-        const habits = await convex.query(api.habits.getHabits, { userId: userIdTyped });
+        const habits = await getConvex().query(api.habits.getHabits, { userId: userIdTyped });
         const habit = habits.find((h: any) => 
           h.name.toLowerCase().includes(args.habitName.toLowerCase())
         );
@@ -438,7 +445,7 @@ async function executeToolCall(
             suggestion: "Try creating the habit first or check the exact name"
           });
         }
-        await convex.mutation(api.habits.logHabit, {
+        await getConvex().mutation(api.habits.logHabit, {
           userId: userIdTyped,
           habitId: habit._id,
           completed: args.completed ?? true,
@@ -449,12 +456,12 @@ async function executeToolCall(
       }
 
       case "get_todos": {
-        const data = await convex.query(api.todos.getSummaryForAI, { userId: userIdTyped });
+        const data = await getConvex().query(api.todos.getSummaryForAI, { userId: userIdTyped });
         return JSON.stringify(data);
       }
 
       case "create_todo": {
-        const todoId = await convex.mutation(api.todos.createTodo, {
+        const todoId = await getConvex().mutation(api.todos.createTodo, {
           userId: userIdTyped,
           title: args.title,
           description: args.description,
@@ -467,7 +474,7 @@ async function executeToolCall(
 
       case "complete_todo": {
         // Find todo by title first
-        const todos = await convex.query(api.todos.getTodos, { userId: userIdTyped });
+        const todos = await getConvex().query(api.todos.getTodos, { userId: userIdTyped });
         const todo = todos.find((t: any) => 
           t.title.toLowerCase().includes(args.todoTitle.toLowerCase()) && !t.completed
         );
@@ -477,7 +484,7 @@ async function executeToolCall(
             suggestion: "Check the task name or view all tasks with get_todos"
           });
         }
-        await convex.mutation(api.todos.completeTodo, {
+        await getConvex().mutation(api.todos.completeTodo, {
           todoId: todo._id,
         });
         return JSON.stringify({ success: true, message: `Completed: ${todo.title}` });
@@ -485,7 +492,7 @@ async function executeToolCall(
 
       // ===== NOTE/KNOWLEDGE TOOLS =====
       case "save_note": {
-        const noteId = await convex.mutation(api.notes.createNote, {
+        const noteId = await getConvex().mutation(api.notes.createNote, {
           userId: userIdTyped,
           title: args.title,
           content: args.content,
@@ -500,7 +507,7 @@ async function executeToolCall(
       }
 
       case "search_notes": {
-        const results = await convex.query(api.notes.searchNotes, {
+        const results = await getConvex().query(api.notes.searchNotes, {
           userId: userIdTyped,
           query: args.query,
         });
@@ -524,12 +531,12 @@ async function executeToolCall(
       case "get_notes": {
         let notes;
         if (args.tag) {
-          notes = await convex.query(api.notes.getNotesByTag, {
+          notes = await getConvex().query(api.notes.getNotesByTag, {
             userId: userIdTyped,
             tag: args.tag,
           });
         } else {
-          notes = await convex.query(api.notes.getNotes, {
+          notes = await getConvex().query(api.notes.getNotes, {
             userId: userIdTyped,
             limit: args.limit || 10,
           });
@@ -668,7 +675,7 @@ Format your response as JSON:
         }
         
         // Save the note
-        const noteId = await convex.mutation(api.notes.createNote, {
+        const noteId = await getConvex().mutation(api.notes.createNote, {
           userId: userIdTyped,
           title: title || "Saved Link",
           content,
@@ -808,7 +815,7 @@ export async function POST(req: NextRequest) {
     let memoryContext: string | null = null;
     // Memory context will be enabled after Convex types are regenerated
     // try {
-    //   memoryContext = await convex.query(api.aiMemory.getMemoryContext, { 
+    //   memoryContext = await getConvex().query(api.aiMemory.getMemoryContext, { 
     //     userId: userId as Id<"users"> 
     //   });
     // } catch (e) {
@@ -908,7 +915,7 @@ export async function POST(req: NextRequest) {
     // Will be enabled after Convex types are regenerated
     // Asynchronously detect if we should learn something from this exchange
     // try {
-    //   await convex.mutation(api.aiMemory.analyzeForLearnings, {
+    //   await getConvex().mutation(api.aiMemory.analyzeForLearnings, {
     //     userId: userId as Id<"users">,
     //     userMessage: message,
     //     aiResponse: finalResponse,

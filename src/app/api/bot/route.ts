@@ -22,7 +22,14 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+// Lazy initialization to avoid build-time errors
+let convex: ConvexHttpClient | null = null;
+function getConvex() {
+  if (!convex) {
+    convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+  }
+  return convex;
+}
 
 // Simple API key auth for bot access
 const BOT_API_KEY = process.env.NOUS_BOT_API_KEY || "nous-bot-dev-key";
@@ -384,12 +391,12 @@ async function executeToolCall(
   try {
     switch (name) {
       case "get_habits": {
-        const data = await convex.query(api.habits.getSummaryForAI, { userId });
+        const data = await getConvex().query(api.habits.getSummaryForAI, { userId });
         return JSON.stringify(data);
       }
 
       case "create_habit": {
-        const habitId = await convex.mutation(api.habits.createHabit, {
+        const habitId = await getConvex().mutation(api.habits.createHabit, {
           userId,
           name: args.name,
           description: args.description,
@@ -407,14 +414,14 @@ async function executeToolCall(
 
       case "log_habit": {
         // Find habit by name and log it
-        const habits = await convex.query(api.habits.getHabits, { userId });
+        const habits = await getConvex().query(api.habits.getHabits, { userId });
         const habit = habits.find((h: any) => 
           h.name.toLowerCase().includes(args.habitName.toLowerCase())
         );
         if (!habit) {
           return JSON.stringify({ error: `Habit "${args.habitName}" not found` });
         }
-        await convex.mutation(api.habits.logHabit, {
+        await getConvex().mutation(api.habits.logHabit, {
           userId,
           habitId: habit._id,
           completed: args.completed ?? true,
@@ -423,7 +430,7 @@ async function executeToolCall(
       }
 
       case "get_todos": {
-        const data = await convex.query(api.todos.getSummaryForAI, { userId });
+        const data = await getConvex().query(api.todos.getSummaryForAI, { userId });
         return JSON.stringify(data);
       }
 
@@ -441,7 +448,7 @@ async function executeToolCall(
           
           if (!parseResponse.ok) {
             // Fallback to simple creation
-            const todoId = await convex.mutation(api.todos.createTodo, {
+            const todoId = await getConvex().mutation(api.todos.createTodo, {
               userId,
               title: args.input,
               priority: "medium",
@@ -451,7 +458,7 @@ async function executeToolCall(
           
           const parsed = await parseResponse.json();
           
-          const todoId = await convex.mutation(api.todos.createTodo, {
+          const todoId = await getConvex().mutation(api.todos.createTodo, {
             userId,
             title: parsed.title || args.input,
             priority: parsed.priority || "medium",
@@ -473,7 +480,7 @@ async function executeToolCall(
           });
         } catch (e) {
           // Fallback to simple creation
-          const todoId = await convex.mutation(api.todos.createTodo, {
+          const todoId = await getConvex().mutation(api.todos.createTodo, {
             userId,
             title: args.input,
             priority: "medium",
@@ -483,19 +490,19 @@ async function executeToolCall(
       }
 
       case "complete_todo": {
-        const todos = await convex.query(api.todos.getTodos, { userId });
+        const todos = await getConvex().query(api.todos.getTodos, { userId });
         const todo = todos.find((t: any) => 
           t.title.toLowerCase().includes(args.todoTitle.toLowerCase()) && !t.completed
         );
         if (!todo) {
           return JSON.stringify({ error: `Todo "${args.todoTitle}" not found` });
         }
-        await convex.mutation(api.todos.completeTodo, { todoId: todo._id });
+        await getConvex().mutation(api.todos.completeTodo, { todoId: todo._id });
         return JSON.stringify({ success: true, message: `Completed: ${todo.title}` });
       }
 
       case "get_projects": {
-        const projects = await convex.query(api.smartTasks.getProjects, { userId });
+        const projects = await getConvex().query(api.smartTasks.getProjects, { userId });
         return JSON.stringify({
           projects: projects.map((p: any) => ({
             name: p.name,
@@ -508,7 +515,7 @@ async function executeToolCall(
       }
 
       case "create_project": {
-        const projectId = await convex.mutation(api.smartTasks.createProject, {
+        const projectId = await getConvex().mutation(api.smartTasks.createProject, {
           userId,
           name: args.name,
           description: args.description,
@@ -522,7 +529,7 @@ async function executeToolCall(
       }
 
       case "get_quick_wins": {
-        const todos = await convex.query(api.todos.getTodos, { userId });
+        const todos = await getConvex().query(api.todos.getTodos, { userId });
         const quickTasks = todos.filter((t: any) => 
           !t.completed && (t.estimatedMinutes ?? 30) <= 15
         );
@@ -541,9 +548,9 @@ async function executeToolCall(
 
       case "get_daily_summary": {
         const [habits, todos, projects] = await Promise.all([
-          convex.query(api.habits.getSummaryForAI, { userId }),
-          convex.query(api.todos.getSummaryForAI, { userId }),
-          convex.query(api.smartTasks.getActiveProjects, { userId }),
+          getConvex().query(api.habits.getSummaryForAI, { userId }),
+          getConvex().query(api.todos.getSummaryForAI, { userId }),
+          getConvex().query(api.smartTasks.getActiveProjects, { userId }),
         ]);
         return JSON.stringify({
           habits,
@@ -555,7 +562,7 @@ async function executeToolCall(
 
       case "add_journal_entry": {
         const today = new Date().toISOString().split('T')[0];
-        await convex.mutation(api.journal.saveEntry, {
+        await getConvex().mutation(api.journal.saveEntry, {
           userId,
           date: today,
           content: args.content,
@@ -565,7 +572,7 @@ async function executeToolCall(
 
       // ===== NOTE/KNOWLEDGE TOOLS =====
       case "save_note": {
-        const noteId = await convex.mutation(api.notes.createNote, {
+        const noteId = await getConvex().mutation(api.notes.createNote, {
           userId,
           title: args.title,
           content: args.content,
@@ -580,7 +587,7 @@ async function executeToolCall(
       }
 
       case "search_notes": {
-        const results = await convex.query(api.notes.searchNotes, {
+        const results = await getConvex().query(api.notes.searchNotes, {
           userId,
           query: args.query,
         });
@@ -601,7 +608,7 @@ async function executeToolCall(
       }
 
       case "get_notes": {
-        const notes = await convex.query(api.notes.getNotes, {
+        const notes = await getConvex().query(api.notes.getNotes, {
           userId,
           limit: args.limit || 5,
         });
@@ -699,7 +706,7 @@ async function executeToolCall(
           content = `**My note:** ${args.userComment}\n\n${content}`;
         }
         
-        const noteId = await convex.mutation(api.notes.createNote, {
+        const noteId = await getConvex().mutation(api.notes.createNote, {
           userId,
           title: title || "Saved Link",
           content,
@@ -822,7 +829,7 @@ export async function POST(req: NextRequest) {
         clerkId = clerkUsers.data[0].id;
         
         // Now get the Convex user by clerkId
-        user = await convex.query(api.users.getUser, { clerkId });
+        user = await getConvex().query(api.users.getUser, { clerkId });
       } catch (clerkError: any) {
         console.error("Clerk lookup error:", clerkError);
         return NextResponse.json(
@@ -833,7 +840,7 @@ export async function POST(req: NextRequest) {
     } else if (identifierType === "clerkId") {
       // Direct clerkId lookup (useful for integrations that already have it)
       clerkId = userIdentifier;
-      user = await convex.query(api.users.getUser, { clerkId: clerkId! });
+      user = await getConvex().query(api.users.getUser, { clerkId: clerkId! });
     } else {
       return NextResponse.json(
         { error: "Phone lookup not implemented yet. Use email or clerkId." },
