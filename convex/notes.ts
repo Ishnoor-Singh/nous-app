@@ -138,9 +138,32 @@ export const createNote = mutation({
     )),
     sourceUrl: v.optional(v.string()),
     sourceId: v.optional(v.string()),
+    attachments: v.optional(v.array(v.object({
+      storageId: v.id("_storage"),
+      url: v.optional(v.string()),
+      type: v.string(),
+      mimeType: v.optional(v.string()),
+      name: v.optional(v.string()),
+      size: v.optional(v.number()),
+    }))),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
+    
+    // Resolve attachment URLs if needed
+    let attachments = args.attachments;
+    if (attachments) {
+      attachments = await Promise.all(
+        attachments.map(async (att) => {
+          if (!att.url) {
+            const url = await ctx.storage.getUrl(att.storageId);
+            return { ...att, url: url || undefined };
+          }
+          return att;
+        })
+      );
+    }
+    
     return await ctx.db.insert("notes", {
       userId: args.userId,
       title: args.title,
@@ -149,6 +172,7 @@ export const createNote = mutation({
       source: args.source || "manual",
       sourceUrl: args.sourceUrl,
       sourceId: args.sourceId,
+      attachments,
       isPinned: false,
       isArchived: false,
       createdAt: now,
@@ -164,6 +188,14 @@ export const updateNote = mutation({
     title: v.optional(v.string()),
     content: v.optional(v.string()),
     tags: v.optional(v.array(v.string())),
+    attachments: v.optional(v.array(v.object({
+      storageId: v.id("_storage"),
+      url: v.optional(v.string()),
+      type: v.string(),
+      mimeType: v.optional(v.string()),
+      name: v.optional(v.string()),
+      size: v.optional(v.number()),
+    }))),
   },
   handler: async (ctx, args) => {
     const updates: Record<string, unknown> = {
@@ -173,6 +205,20 @@ export const updateNote = mutation({
     if (args.title !== undefined) updates.title = args.title;
     if (args.content !== undefined) updates.content = args.content;
     if (args.tags !== undefined) updates.tags = args.tags;
+    
+    // Resolve attachment URLs if needed
+    if (args.attachments !== undefined) {
+      const attachments = await Promise.all(
+        args.attachments.map(async (att) => {
+          if (!att.url) {
+            const url = await ctx.storage.getUrl(att.storageId);
+            return { ...att, url: url || undefined };
+          }
+          return att;
+        })
+      );
+      updates.attachments = attachments;
+    }
     
     await ctx.db.patch(args.noteId, updates);
     return args.noteId;

@@ -433,7 +433,7 @@ RESPONSE RULES:
 // ===== MAIN HANDLER =====
 export async function POST(req: NextRequest) {
   try {
-    const { message, conversationId, userId, emotionalState, messages } = await req.json();
+    const { message, conversationId, userId, emotionalState, messages, imageUrl } = await req.json();
 
     // Check for video URL
     const videoUrl = extractVideoUrl(message);
@@ -466,16 +466,31 @@ export async function POST(req: NextRequest) {
         content: m.content,
       }));
 
-    // Initial API call with tools
+    // Build user message content - with or without image
+    let userMessageContent: string | Array<{ type: string; text?: string; image_url?: { url: string } }>;
+    
+    if (imageUrl) {
+      // Use vision format with image
+      userMessageContent = [
+        { type: "text", text: message || "What do you see in this image?" },
+        { type: "image_url", image_url: { url: imageUrl } },
+      ];
+    } else {
+      userMessageContent = message;
+    }
+
+    // Initial API call with tools (use gpt-4o for vision when image present)
+    const model = imageUrl ? "gpt-4o" : "gpt-4o-mini";
+    
     let response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model,
       messages: [
-        { role: "system", content: buildSystemPrompt(emotionalState, videoContext, memoryContext) },
+        { role: "system", content: buildSystemPrompt(emotionalState, videoContext, memoryContext) + (imageUrl ? "\n\nThe user has shared an image. Describe what you see and engage with it naturally. You can comment on it, ask questions about it, or relate it to your conversation." : "") },
         ...conversationHistory,
-        { role: "user", content: message },
+        { role: "user", content: userMessageContent as any },
       ],
-      tools,
-      tool_choice: "auto",
+      tools: imageUrl ? undefined : tools, // Don't use tools with vision for now
+      tool_choice: imageUrl ? undefined : "auto",
       temperature: 0.8,
       max_tokens: 1500,
     });
@@ -549,6 +564,7 @@ export async function POST(req: NextRequest) {
       response: finalResponse,
       emotion,
       videoProcessed: !!videoUrl,
+      imageProcessed: !!imageUrl,
       toolsUsed: toolResults.map(t => t.name),
       memoryUsed: !!memoryContext,
     });

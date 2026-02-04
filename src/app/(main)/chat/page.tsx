@@ -5,9 +5,10 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Loader2, Plus, MessageSquare, ChevronLeft, Menu, X } from "lucide-react";
+import { Send, Loader2, Plus, MessageSquare, ChevronLeft, Menu, X, Image as ImageIcon } from "lucide-react";
 import { Id } from "../../../../convex/_generated/dataModel";
 import { CreatureCharacter, CREATURES, type CreatureId, type MoodType } from "@/components/creature/CreatureCharacter";
+import ImageUpload, { ImagePreviewBadge } from "@/components/ImageUpload";
 
 export default function ChatPage() {
   const { user } = useUser();
@@ -37,6 +38,14 @@ export default function ChatPage() {
   const [creatureMood, setCreatureMood] = useState<MoodType>("idle");
   const [creatureMessage, setCreatureMessage] = useState("");
   const [showCreatureMessage, setShowCreatureMessage] = useState(false);
+  const [attachedImage, setAttachedImage] = useState<{
+    storageId: Id<"_storage">;
+    url: string;
+    type: string;
+    mimeType: string;
+    name: string;
+    size: number;
+  } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -83,10 +92,12 @@ export default function ChatPage() {
   };
 
   const handleSend = async () => {
-    if (!input.trim() || !userData?.user || isLoading) return;
+    if ((!input.trim() && !attachedImage) || !userData?.user || isLoading) return;
 
-    const messageText = input.trim();
+    const messageText = input.trim() || (attachedImage ? "📷 Shared an image" : "");
+    const currentAttachment = attachedImage;
     setInput("");
+    setAttachedImage(null);
     setIsLoading(true);
     setCreatureMood("thinking");
 
@@ -97,22 +108,43 @@ export default function ChatPage() {
         setActiveConversationId(convId);
       }
 
+      // Prepare attachments array
+      const attachments = currentAttachment
+        ? [{
+            storageId: currentAttachment.storageId,
+            url: currentAttachment.url,
+            type: currentAttachment.type,
+            mimeType: currentAttachment.mimeType,
+            name: currentAttachment.name,
+            size: currentAttachment.size,
+          }]
+        : undefined;
+
       await addMessage({
         conversationId: convId,
         role: "user",
         content: messageText,
+        attachments,
       });
+
+      // Build API request with image data if available
+      const apiBody: Record<string, any> = {
+        message: messageText,
+        conversationId: convId,
+        userId: userData.user._id,
+        emotionalState: userData.emotionalState,
+        messages: conversationData?.messages || [],
+      };
+
+      // If there's an image, include its URL for vision processing
+      if (currentAttachment) {
+        apiBody.imageUrl = currentAttachment.url;
+      }
 
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: messageText,
-          conversationId: convId,
-          userId: userData.user._id,
-          emotionalState: userData.emotionalState,
-          messages: conversationData?.messages || [],
-        }),
+        body: JSON.stringify(apiBody),
       });
 
       const data = await response.json();
@@ -378,6 +410,21 @@ export default function ChatPage() {
                     : {}
                 }
               >
+                {/* Show attachments if any */}
+                {message.attachments && message.attachments.length > 0 && (
+                  <div className="mb-3 space-y-2">
+                    {message.attachments.map((att, i) => (
+                      att.type === "image" && att.url && (
+                        <img
+                          key={i}
+                          src={att.url}
+                          alt={att.name || "Attached image"}
+                          className="max-w-full rounded-lg max-h-64 object-contain"
+                        />
+                      )
+                    ))}
+                  </div>
+                )}
                 <p className="whitespace-pre-wrap leading-relaxed text-white">
                   {message.content}
                 </p>
@@ -418,14 +465,37 @@ export default function ChatPage() {
           borderTop: "1px solid rgba(255,255,255,0.08)",
         }}
       >
+        {/* Image Preview */}
+        <AnimatePresence>
+          {attachedImage && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              className="mb-3"
+            >
+              <ImagePreviewBadge
+                url={attachedImage.url}
+                onRemove={() => setAttachedImage(null)}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <div className="flex items-end gap-3">
           <div
-            className="flex-1 rounded-2xl"
+            className="flex-1 rounded-2xl flex items-end"
             style={{
               background: "rgba(255,255,255,0.05)",
               border: "1px solid rgba(255,255,255,0.1)",
             }}
           >
+            {/* Image Upload Button */}
+            <ImageUpload
+              compact
+              onUpload={(file) => setAttachedImage(file)}
+              className="ml-2 mb-2"
+            />
             <textarea
               ref={inputRef}
               value={input}
@@ -433,15 +503,15 @@ export default function ChatPage() {
               onKeyDown={handleKeyDown}
               onFocus={() => setCreatureMood("curious")}
               onBlur={() => !isLoading && setCreatureMood("idle")}
-              placeholder={`Ask about habits, tasks, or anything...`}
+              placeholder={attachedImage ? "Add a message..." : "Ask about habits, tasks, or anything..."}
               rows={1}
-              className="w-full p-4 bg-transparent resize-none focus:outline-none max-h-32 text-white placeholder:text-white/40"
+              className="flex-1 p-4 bg-transparent resize-none focus:outline-none max-h-32 text-white placeholder:text-white/40"
               style={{ height: "auto", minHeight: "56px" }}
             />
           </div>
           <motion.button
             onClick={handleSend}
-            disabled={!input.trim() || isLoading}
+            disabled={(!input.trim() && !attachedImage) || isLoading}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             className="w-14 h-14 rounded-2xl bg-gradient-to-r from-accent to-purple-600 text-white flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"

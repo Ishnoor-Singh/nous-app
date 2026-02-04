@@ -22,8 +22,10 @@ import {
   X,
   Filter,
   ChevronDown,
+  Image as ImageIcon,
 } from "lucide-react";
 import { Id } from "../../../../convex/_generated/dataModel";
+import ImageUpload from "@/components/ImageUpload";
 
 // Source icons and colors
 const SOURCE_CONFIG: Record<string, { icon: any; label: string; color: string }> = {
@@ -69,6 +71,14 @@ export default function NotesPage() {
   const [viewMode, setViewMode] = useState<ViewMode>("all");
   const [isCreating, setIsCreating] = useState(false);
   const [newNote, setNewNote] = useState({ title: "", content: "", tags: "" });
+  const [newNoteAttachment, setNewNoteAttachment] = useState<{
+    storageId: Id<"_storage">;
+    url: string;
+    type: string;
+    mimeType: string;
+    name: string;
+    size: number;
+  } | null>(null);
   const [expandedNote, setExpandedNote] = useState<string | null>(null);
 
   // Search notes
@@ -114,9 +124,18 @@ export default function NotesPage() {
       content: newNote.content.trim(),
       tags: newNote.tags ? newNote.tags.split(",").map((t) => t.trim()).filter(Boolean) : undefined,
       source: "manual",
+      attachments: newNoteAttachment ? [{
+        storageId: newNoteAttachment.storageId,
+        url: newNoteAttachment.url,
+        type: newNoteAttachment.type,
+        mimeType: newNoteAttachment.mimeType,
+        name: newNoteAttachment.name,
+        size: newNoteAttachment.size,
+      }] : undefined,
     });
     
     setNewNote({ title: "", content: "", tags: "" });
+    setNewNoteAttachment(null);
     setIsCreating(false);
   };
 
@@ -318,9 +337,22 @@ export default function NotesPage() {
                 className="w-full px-4 py-3 rounded-xl glass-card bg-white/5 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-accent/50"
               />
               
+              {/* Image Upload */}
+              <div>
+                <p className="text-sm text-white/50 mb-2">Attach image (optional)</p>
+                <ImageUpload
+                  onUpload={(file) => setNewNoteAttachment(file)}
+                  onRemove={() => setNewNoteAttachment(null)}
+                  preview={newNoteAttachment?.url}
+                />
+              </div>
+              
               <div className="flex gap-3">
                 <button
-                  onClick={() => setIsCreating(false)}
+                  onClick={() => {
+                    setIsCreating(false);
+                    setNewNoteAttachment(null);
+                  }}
                   className="flex-1 py-3 rounded-xl glass-button text-white/70"
                 >
                   Cancel
@@ -402,6 +434,24 @@ export default function NotesPage() {
                           {note.title}
                         </h3>
                         
+                        {/* Attachments */}
+                        {note.attachments && note.attachments.length > 0 && (
+                          <div className={`mt-2 ${isExpanded ? "" : "max-h-20 overflow-hidden"}`}>
+                            {note.attachments.map((att, i) => (
+                              att.type === "image" && att.url && (
+                                <img
+                                  key={i}
+                                  src={att.url}
+                                  alt={att.name || "Attachment"}
+                                  className={`rounded-lg object-cover ${
+                                    isExpanded ? "max-h-64 w-full" : "max-h-20 w-auto"
+                                  }`}
+                                />
+                              )
+                            ))}
+                          </div>
+                        )}
+                        
                         {/* Preview */}
                         <p className={`text-white/60 text-sm mt-1 ${isExpanded ? "" : "line-clamp-2"}`}>
                           {note.content}
@@ -420,6 +470,14 @@ export default function NotesPage() {
                             <Clock className="w-3 h-3" />
                             {formatDate(note.createdAt)}
                           </span>
+                          
+                          {/* Attachment indicator */}
+                          {note.attachments && note.attachments.length > 0 && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 flex items-center gap-1">
+                              <ImageIcon className="w-3 h-3" />
+                              {note.attachments.length}
+                            </span>
+                          )}
                           
                           {/* Tags */}
                           {note.tags && note.tags.slice(0, 3).map((tag) => (

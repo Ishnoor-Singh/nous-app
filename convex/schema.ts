@@ -52,6 +52,15 @@ export default defineSchema({
     conversationId: v.id("conversations"),
     role: v.union(v.literal("user"), v.literal("assistant")),
     content: v.string(),
+    // Media attachments (images, files)
+    attachments: v.optional(v.array(v.object({
+      storageId: v.id("_storage"),  // Convex file storage ID
+      url: v.optional(v.string()),   // Public URL (populated after upload)
+      type: v.string(),              // "image", "file", "audio"
+      mimeType: v.optional(v.string()), // e.g., "image/jpeg"
+      name: v.optional(v.string()),  // Original filename
+      size: v.optional(v.number()),  // File size in bytes
+    }))),
     // For AI messages: what emotional state influenced this response
     emotionalContext: v.optional(v.object({
       valence: v.number(),
@@ -415,6 +424,15 @@ export default defineSchema({
     )),
     sourceUrl: v.optional(v.string()), // If from external source
     sourceId: v.optional(v.string()),  // If linked to savedMedia etc
+    // Media attachments (images, files)
+    attachments: v.optional(v.array(v.object({
+      storageId: v.id("_storage"),  // Convex file storage ID
+      url: v.optional(v.string()),   // Public URL (populated after upload)
+      type: v.string(),              // "image", "file", "audio"
+      mimeType: v.optional(v.string()), // e.g., "image/jpeg"
+      name: v.optional(v.string()),  // Original filename
+      size: v.optional(v.number()),  // File size in bytes
+    }))),
     // AI enrichment
     summary: v.optional(v.string()),   // AI-generated summary
     relatedTopics: v.optional(v.array(v.string())), // AI-detected topics

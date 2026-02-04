@@ -11,6 +11,7 @@
 import type * as aiMemory from "../aiMemory.js";
 import type * as conversations from "../conversations.js";
 import type * as emotions from "../emotions.js";
+import type * as files from "../files.js";
 import type * as habits from "../habits.js";
 import type * as journal from "../journal.js";
 import type * as knowledge from "../knowledge.js";
@@ -30,6 +31,7 @@ declare const fullApi: ApiFromModules<{
   aiMemory: typeof aiMemory;
   conversations: typeof conversations;
   emotions: typeof emotions;
+  files: typeof files;
   habits: typeof habits;
   journal: typeof journal;
   knowledge: typeof knowledge;
