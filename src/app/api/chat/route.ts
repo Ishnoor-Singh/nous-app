@@ -87,16 +87,16 @@ const tools: ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "log_habit",
-      description: "Mark a habit as complete or log progress for today",
+      description: "Mark a habit as complete or log progress for today. Use the habit name to identify it.",
       parameters: {
         type: "object",
         properties: {
-          habitId: { type: "string", description: "ID of the habit" },
-          completed: { type: "boolean", description: "Whether completed" },
+          habitName: { type: "string", description: "Name of the habit (partial match supported)" },
+          completed: { type: "boolean", description: "Whether completed (default true)" },
           value: { type: "number", description: "Value for count/duration habits" },
           notes: { type: "string", description: "Optional notes" },
         },
-        required: ["habitId"],
+        required: ["habitName"],
       },
     },
   },
@@ -130,13 +130,13 @@ const tools: ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "complete_todo",
-      description: "Mark a task as complete",
+      description: "Mark a task as complete by its title",
       parameters: {
         type: "object",
         properties: {
-          todoId: { type: "string", description: "ID of the todo to complete" },
+          todoTitle: { type: "string", description: "Title of the task to complete (partial match supported)" },
         },
-        required: ["todoId"],
+        required: ["todoTitle"],
       },
     },
   },
@@ -173,14 +173,25 @@ async function executeToolCall(
       }
 
       case "log_habit": {
+        // Find habit by name first
+        const habits = await convex.query(api.habits.getHabits, { userId: userIdTyped });
+        const habit = habits.find((h: any) => 
+          h.name.toLowerCase().includes(args.habitName.toLowerCase())
+        );
+        if (!habit) {
+          return JSON.stringify({ 
+            error: `Habit "${args.habitName}" not found`,
+            suggestion: "Try creating the habit first or check the exact name"
+          });
+        }
         await convex.mutation(api.habits.logHabit, {
           userId: userIdTyped,
-          habitId: args.habitId as Id<"habits">,
+          habitId: habit._id,
           completed: args.completed ?? true,
           value: args.value,
           notes: args.notes,
         });
-        return JSON.stringify({ success: true, message: "Habit logged!" });
+        return JSON.stringify({ success: true, message: `Logged ${habit.name} as ${args.completed !== false ? 'complete' : 'incomplete'}!` });
       }
 
       case "get_todos": {
@@ -201,10 +212,21 @@ async function executeToolCall(
       }
 
       case "complete_todo": {
+        // Find todo by title first
+        const todos = await convex.query(api.todos.getTodos, { userId: userIdTyped });
+        const todo = todos.find((t: any) => 
+          t.title.toLowerCase().includes(args.todoTitle.toLowerCase()) && !t.completed
+        );
+        if (!todo) {
+          return JSON.stringify({ 
+            error: `Task "${args.todoTitle}" not found or already completed`,
+            suggestion: "Check the task name or view all tasks with get_todos"
+          });
+        }
         await convex.mutation(api.todos.completeTodo, {
-          todoId: args.todoId as Id<"todos">,
+          todoId: todo._id,
         });
-        return JSON.stringify({ success: true, message: "Task marked complete!" });
+        return JSON.stringify({ success: true, message: `Completed: ${todo.title}` });
       }
 
       default:

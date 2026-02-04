@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { ConvexHttpClient } from "convex/browser";
+import { clerkClient } from "@clerk/nextjs/server";
 import { api } from "../../../../convex/_generated/api";
 import { Id } from "../../../../convex/_generated/dataModel";
 
@@ -34,6 +35,27 @@ const tools = [
       name: "get_habits",
       description: "Get the user's habits and today's progress",
       parameters: { type: "object", properties: {}, required: [] },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "create_habit",
+      description: "Create a new habit for the user to track daily",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Name of the habit" },
+          description: { type: "string", description: "Optional description" },
+          icon: { type: "string", description: "Emoji icon for the habit" },
+          category: { 
+            type: "string", 
+            enum: ["fitness", "nutrition", "mindfulness", "learning", "productivity", "health", "custom"],
+            description: "Category of the habit"
+          },
+        },
+        required: ["name"],
+      },
     },
   },
   {
@@ -154,6 +176,23 @@ async function executeToolCall(
       case "get_habits": {
         const data = await convex.query(api.habits.getSummaryForAI, { userId });
         return JSON.stringify(data);
+      }
+
+      case "create_habit": {
+        const habitId = await convex.mutation(api.habits.createHabit, {
+          userId,
+          name: args.name,
+          description: args.description,
+          icon: args.icon || "✨",
+          category: args.category || "custom",
+          trackingType: "boolean",
+          frequency: "daily",
+        });
+        return JSON.stringify({ 
+          success: true, 
+          habitId, 
+          message: `Created habit: ${args.icon || "✨"} ${args.name}` 
+        });
       }
 
       case "log_habit": {
@@ -388,21 +427,51 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Find user by identifier
+    // Find user - use Clerk Admin API to look up by email, then get Convex user
     let user;
+    let clerkId: string | null = null;
+    
     if (identifierType === "email") {
-      user = await convex.query(api.users.getUserByEmail, { email: userIdentifier });
+      try {
+        // Look up user in Clerk by email
+        const clerk = await clerkClient();
+        const clerkUsers = await clerk.users.getUserList({
+          emailAddress: [userIdentifier],
+          limit: 1,
+        });
+        
+        if (clerkUsers.data.length === 0) {
+          return NextResponse.json(
+            { error: "User not found in Clerk", suggestion: "User needs to create an account first" },
+            { status: 404 }
+          );
+        }
+        
+        clerkId = clerkUsers.data[0].id;
+        
+        // Now get the Convex user by clerkId
+        user = await convex.query(api.users.getUser, { clerkId });
+      } catch (clerkError: any) {
+        console.error("Clerk lookup error:", clerkError);
+        return NextResponse.json(
+          { error: "Failed to look up user", details: clerkError.message },
+          { status: 500 }
+        );
+      }
+    } else if (identifierType === "clerkId") {
+      // Direct clerkId lookup (useful for integrations that already have it)
+      clerkId = userIdentifier;
+      user = await convex.query(api.users.getUser, { clerkId });
     } else {
-      // For phone, we'd need to add this query - for now use email
       return NextResponse.json(
-        { error: "Phone lookup not implemented yet" },
+        { error: "Phone lookup not implemented yet. Use email or clerkId." },
         { status: 400 }
       );
     }
 
     if (!user) {
       return NextResponse.json(
-        { error: "User not found", suggestion: "User needs to create an account first" },
+        { error: "User not found in database", suggestion: "User exists in Clerk but not synced to Convex yet. They need to log in to the app first." },
         { status: 404 }
       );
     }
