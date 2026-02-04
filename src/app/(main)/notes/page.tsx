@@ -27,7 +27,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { Id } from "../../../../convex/_generated/dataModel";
-import { BlockEditor, NoteSidebar, AIAssistant, BacklinksPanel } from "@/components/editor";
+import { BlockEditor, NoteSidebar, AIAssistant, BacklinksPanel, EditorHelp } from "@/components/editor";
 import ImageUpload from "@/components/ImageUpload";
 
 // Source icons and colors
@@ -351,6 +351,9 @@ function DesktopNotesView() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Help Button */}
+      <EditorHelp />
     </div>
   );
 }
