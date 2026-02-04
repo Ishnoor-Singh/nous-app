@@ -9,6 +9,10 @@ export default defineSchema({
     name: v.optional(v.string()),
     imageUrl: v.optional(v.string()),
     createdAt: v.number(),
+    preferences: v.optional(v.object({
+      responseStyle: v.optional(v.string()), // "brief" | "balanced" | "detailed"
+      goals: v.optional(v.array(v.string())), // ["learn", "habits", "organize", etc.]
+    })),
   }).index("by_clerk_id", ["clerkId"]),
 
   // AI's emotional state per user

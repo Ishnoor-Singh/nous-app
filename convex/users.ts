@@ -111,17 +111,27 @@ export const completeOnboarding = mutation({
     userId: v.id("users"),
     preferredName: v.string(),
     interests: v.array(v.string()),
+    goals: v.optional(v.array(v.string())),
     learningStyle: v.union(
       v.literal("socratic"),
       v.literal("narrative"),
       v.literal("analytical"),
       v.literal("visual")
     ),
+    responseStyle: v.optional(v.union(
+      v.literal("brief"),
+      v.literal("balanced"),
+      v.literal("detailed")
+    )),
   },
   handler: async (ctx, args) => {
-    // Update user name if provided
+    // Update user with name and preferences
     await ctx.db.patch(args.userId, {
       name: args.preferredName,
+      preferences: {
+        responseStyle: args.responseStyle || "balanced",
+        goals: args.goals || [],
+      },
     });
 
     // Update learning progress with preferences

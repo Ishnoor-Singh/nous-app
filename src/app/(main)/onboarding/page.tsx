@@ -14,6 +14,8 @@ const STEPS = [
   { id: "creature", component: CreatureStep },
   { id: "name", component: NameStep },
   { id: "interests", component: InterestsStep },
+  { id: "goals", component: GoalsStep },
+  { id: "style", component: StyleStep },
   { id: "ready", component: ReadyStep },
 ];
 
@@ -24,7 +26,9 @@ export default function OnboardingPage() {
   const [data, setData] = useState({
     preferredName: "",
     interests: [] as string[],
-    learningStyle: "narrative",
+    goals: [] as string[],
+    learningStyle: "narrative" as "socratic" | "narrative" | "analytical" | "visual",
+    responseStyle: "balanced" as "brief" | "balanced" | "detailed",
     creatureId: null as CreatureId | null,
   });
 
@@ -369,6 +373,192 @@ function InterestsStep({ data, updateData, onNext }: any) {
   );
 }
 
+function GoalsStep({ data, updateData, onNext }: any) {
+  const [selected, setSelected] = useState<string[]>(data.goals || []);
+
+  const goals = [
+    { id: "learn", label: "Learn new things daily", icon: "📚", desc: "Build knowledge consistently" },
+    { id: "habits", label: "Build better habits", icon: "🎯", desc: "Track and improve routines" },
+    { id: "organize", label: "Stay organized", icon: "📋", desc: "Manage tasks and notes" },
+    { id: "reflect", label: "Reflect & journal", icon: "✍️", desc: "Process thoughts and feelings" },
+    { id: "focus", label: "Improve focus", icon: "🧘", desc: "Reduce distractions" },
+    { id: "create", label: "Be more creative", icon: "💡", desc: "Generate ideas and explore" },
+  ];
+
+  const toggle = (id: string) => {
+    setSelected((prev) => (prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id]));
+  };
+
+  const handleContinue = () => {
+    updateData("goals", selected);
+    onNext();
+  };
+
+  return (
+    <div className="flex-1 flex flex-col">
+      <div className="text-center mb-6">
+        {data.creatureId && (
+          <motion.div animate={{ y: [0, -8, 0] }} transition={{ duration: 2, repeat: Infinity }} className="mb-4">
+            <CreatureCharacter creatureId={data.creatureId} mood={selected.length > 0 ? "happy" : "curious"} size={80} />
+          </motion.div>
+        )}
+        <h2 className="text-3xl font-bold text-white mb-2">What are your goals?</h2>
+        <p className="text-white/50">Pick what you want to achieve</p>
+      </div>
+
+      <div className="flex-1 space-y-3 overflow-y-auto">
+        {goals.map((goal, index) => {
+          const isSelected = selected.includes(goal.id);
+          return (
+            <motion.button
+              key={goal.id}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: index * 0.08 }}
+              onClick={() => toggle(goal.id)}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className={`w-full p-4 rounded-2xl flex items-center gap-4 transition-all ${
+                isSelected ? "bg-gradient-to-r from-accent/30 to-purple-600/30" : "bg-white/5"
+              }`}
+              style={{
+                border: isSelected ? "1px solid rgba(255,255,255,0.3)" : "1px solid rgba(255,255,255,0.1)",
+              }}
+            >
+              <span className="text-2xl">{goal.icon}</span>
+              <div className="flex-1 text-left">
+                <span className="font-semibold text-white">{goal.label}</span>
+                <p className="text-xs text-white/50">{goal.desc}</p>
+              </div>
+              {isSelected && (
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  className="w-6 h-6 rounded-full bg-gradient-to-r from-accent to-purple-600 flex items-center justify-center"
+                >
+                  <Check className="w-4 h-4 text-white" />
+                </motion.div>
+              )}
+            </motion.button>
+          );
+        })}
+      </div>
+
+      <motion.button
+        onClick={handleContinue}
+        disabled={selected.length === 0}
+        whileHover={{ scale: selected.length > 0 ? 1.02 : 1 }}
+        whileTap={{ scale: selected.length > 0 ? 0.98 : 1 }}
+        className="mt-4 w-full py-4 bg-gradient-to-r from-accent to-purple-600 text-white rounded-2xl font-semibold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        Continue
+        <ArrowRight className="w-5 h-5" />
+      </motion.button>
+    </div>
+  );
+}
+
+function StyleStep({ data, updateData, onNext }: any) {
+  const [responseStyle, setResponseStyle] = useState(data.responseStyle || "balanced");
+  const [learningStyle, setLearningStyle] = useState(data.learningStyle || "narrative");
+
+  const responseStyles = [
+    { id: "brief", label: "Brief & Direct", icon: "⚡", desc: "Short, to-the-point answers" },
+    { id: "balanced", label: "Balanced", icon: "⚖️", desc: "Clear explanations with context" },
+    { id: "detailed", label: "Deep & Thorough", icon: "📖", desc: "Comprehensive explorations" },
+  ];
+
+  const learningStyles = [
+    { id: "socratic", label: "Socratic", icon: "❓", desc: "Learn through questions" },
+    { id: "narrative", label: "Storytelling", icon: "📚", desc: "Learn through stories" },
+    { id: "analytical", label: "Analytical", icon: "🔬", desc: "Data and logic focused" },
+    { id: "visual", label: "Visual", icon: "🎨", desc: "Examples and analogies" },
+  ];
+
+  const handleContinue = () => {
+    updateData("responseStyle", responseStyle);
+    updateData("learningStyle", learningStyle);
+    onNext();
+  };
+
+  return (
+    <div className="flex-1 flex flex-col">
+      <div className="text-center mb-6">
+        {data.creatureId && (
+          <motion.div animate={{ y: [0, -8, 0] }} transition={{ duration: 2, repeat: Infinity }} className="mb-4">
+            <CreatureCharacter creatureId={data.creatureId} mood="curious" size={80} />
+          </motion.div>
+        )}
+        <h2 className="text-3xl font-bold text-white mb-2">How should I talk?</h2>
+        <p className="text-white/50">Customize your experience</p>
+      </div>
+
+      <div className="flex-1 space-y-6 overflow-y-auto">
+        {/* Response Style */}
+        <div>
+          <h3 className="text-sm font-semibold text-white/70 mb-3 uppercase tracking-wide">Response Style</h3>
+          <div className="space-y-2">
+            {responseStyles.map((style) => (
+              <motion.button
+                key={style.id}
+                onClick={() => setResponseStyle(style.id)}
+                whileTap={{ scale: 0.98 }}
+                className={`w-full p-3 rounded-xl flex items-center gap-3 transition-all ${
+                  responseStyle === style.id ? "bg-accent/20 border-accent/50" : "bg-white/5 border-white/10"
+                }`}
+                style={{ border: "1px solid" }}
+              >
+                <span className="text-xl">{style.icon}</span>
+                <div className="flex-1 text-left">
+                  <span className="font-medium text-white">{style.label}</span>
+                  <p className="text-xs text-white/50">{style.desc}</p>
+                </div>
+                {responseStyle === style.id && (
+                  <div className="w-5 h-5 rounded-full bg-accent flex items-center justify-center">
+                    <Check className="w-3 h-3 text-white" />
+                  </div>
+                )}
+              </motion.button>
+            ))}
+          </div>
+        </div>
+
+        {/* Learning Style */}
+        <div>
+          <h3 className="text-sm font-semibold text-white/70 mb-3 uppercase tracking-wide">Learning Style</h3>
+          <div className="grid grid-cols-2 gap-2">
+            {learningStyles.map((style) => (
+              <motion.button
+                key={style.id}
+                onClick={() => setLearningStyle(style.id)}
+                whileTap={{ scale: 0.98 }}
+                className={`p-3 rounded-xl flex flex-col items-center gap-2 transition-all ${
+                  learningStyle === style.id ? "bg-accent/20 border-accent/50" : "bg-white/5 border-white/10"
+                }`}
+                style={{ border: "1px solid" }}
+              >
+                <span className="text-2xl">{style.icon}</span>
+                <span className="font-medium text-white text-sm">{style.label}</span>
+                <p className="text-xs text-white/50 text-center">{style.desc}</p>
+              </motion.button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <motion.button
+        onClick={handleContinue}
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+        className="mt-4 w-full py-4 bg-gradient-to-r from-accent to-purple-600 text-white rounded-2xl font-semibold flex items-center justify-center gap-2"
+      >
+        Almost done!
+        <ArrowRight className="w-5 h-5" />
+      </motion.button>
+    </div>
+  );
+}
+
 function ReadyStep({ data, userData }: any) {
   const router = useRouter();
   const [isReady, setIsReady] = useState(false);
@@ -390,7 +580,9 @@ function ReadyStep({ data, userData }: any) {
         userId: userData.user._id,
         preferredName: data.preferredName,
         interests: data.interests || [],
+        goals: data.goals || [],
         learningStyle: data.learningStyle || "narrative",
+        responseStyle: data.responseStyle || "balanced",
       });
       router.push("/home");
     } catch (error) {
