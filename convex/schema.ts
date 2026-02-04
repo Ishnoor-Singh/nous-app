@@ -395,4 +395,41 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_user_status", ["userId", "status"]),
+
+  // Notes - personal knowledge base (Me-bot style)
+  notes: defineTable({
+    userId: v.id("users"),
+    title: v.string(),
+    content: v.string(),
+    // Organization
+    tags: v.optional(v.array(v.string())),
+    source: v.optional(v.union(
+      v.literal("chat"),      // Created via AI conversation
+      v.literal("manual"),    // User typed directly
+      v.literal("video"),     // From video summary
+      v.literal("article"),   // From article
+      v.literal("highlight"), // From highlight
+      v.literal("journal"),   // From journal entry
+      v.literal("capture"),   // From quick capture
+      v.literal("import"),    // Imported from elsewhere
+    )),
+    sourceUrl: v.optional(v.string()), // If from external source
+    sourceId: v.optional(v.string()),  // If linked to savedMedia etc
+    // AI enrichment
+    summary: v.optional(v.string()),   // AI-generated summary
+    relatedTopics: v.optional(v.array(v.string())), // AI-detected topics
+    // Status
+    isPinned: v.optional(v.boolean()),
+    isArchived: v.optional(v.boolean()),
+    // Timestamps
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_pinned", ["userId", "isPinned"])
+    .index("by_user_archived", ["userId", "isArchived"])
+    .searchIndex("search_notes", {
+      searchField: "content",
+      filterFields: ["userId"],
+    }),
 });

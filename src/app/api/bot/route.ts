@@ -163,6 +163,51 @@ const tools = [
       },
     },
   },
+  // ===== NOTE/KNOWLEDGE TOOLS =====
+  {
+    type: "function" as const,
+    function: {
+      name: "save_note",
+      description: "Save a piece of knowledge, insight, or information. Use when user says 'remember this', 'note that', or shares something worth saving.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Short title for the note" },
+          content: { type: "string", description: "The content to save" },
+          tags: { type: "array", items: { type: "string" }, description: "Optional tags" },
+        },
+        required: ["title", "content"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "search_notes",
+      description: "Search the user's saved notes. Use when user asks to recall or find something they saved before.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Search query" },
+        },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "get_notes",
+      description: "Get user's recent notes. Use when user asks to see their notes or knowledge base.",
+      parameters: {
+        type: "object",
+        properties: {
+          limit: { type: "number", description: "Number of notes to return (default 5)" },
+        },
+        required: [],
+      },
+    },
+  },
 ];
 
 // ===== EXECUTE TOOL CALLS =====
@@ -353,6 +398,59 @@ async function executeToolCall(
         return JSON.stringify({ success: true, message: "Journal entry added" });
       }
 
+      // ===== NOTE/KNOWLEDGE TOOLS =====
+      case "save_note": {
+        const noteId = await convex.mutation(api.notes.createNote, {
+          userId,
+          title: args.title,
+          content: args.content,
+          tags: args.tags,
+          source: "chat",
+        });
+        return JSON.stringify({ 
+          success: true, 
+          noteId, 
+          message: `📝 Saved: "${args.title}"` 
+        });
+      }
+
+      case "search_notes": {
+        const results = await convex.query(api.notes.searchNotes, {
+          userId,
+          query: args.query,
+        });
+        if (results.length === 0) {
+          return JSON.stringify({ 
+            notes: [], 
+            message: `No notes found for "${args.query}"` 
+          });
+        }
+        return JSON.stringify({
+          notes: results.slice(0, 5).map((n: any) => ({
+            title: n.title,
+            preview: n.content.slice(0, 100) + (n.content.length > 100 ? "..." : ""),
+            tags: n.tags,
+          })),
+          count: results.length,
+        });
+      }
+
+      case "get_notes": {
+        const notes = await convex.query(api.notes.getNotes, {
+          userId,
+          limit: args.limit || 5,
+        });
+        return JSON.stringify({
+          notes: notes.map((n: any) => ({
+            title: n.title,
+            preview: n.content.slice(0, 80) + (n.content.length > 80 ? "..." : ""),
+            tags: n.tags,
+            source: n.source,
+          })),
+          count: notes.length,
+        });
+      }
+
       default:
         return JSON.stringify({ error: `Unknown tool: ${name}` });
     }
@@ -379,6 +477,9 @@ CAPABILITIES:
 - Find quick wins (tasks under 15 min)
 - Add journal entries
 - Provide daily summaries
+- **Notes/Knowledge**: Save and search notes for the user
+  - When user says "remember this" or "note that" → use save_note
+  - When user asks "what did I save about..." → use search_notes
 - General chat and support
 
 FORMATTING FOR MESSAGING:

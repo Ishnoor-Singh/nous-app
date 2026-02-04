@@ -47,6 +47,7 @@ async function fetchVideoTranscript(videoUrl: string): Promise<{ text: string | 
 
 // ===== TOOL DEFINITIONS =====
 const tools: ChatCompletionTool[] = [
+  // ===== HABIT TOOLS =====
   {
     type: "function",
     function: {
@@ -140,6 +141,57 @@ const tools: ChatCompletionTool[] = [
       },
     },
   },
+  // ===== NOTE/KNOWLEDGE TOOLS =====
+  {
+    type: "function",
+    function: {
+      name: "save_note",
+      description: "Save a piece of knowledge, insight, or information. Use when user says 'remember this', 'note that', 'save this', or when they share something worth remembering.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Short title for the note" },
+          content: { type: "string", description: "The full content/information to save" },
+          tags: { type: "array", items: { type: "string" }, description: "Optional tags for categorization" },
+          source: { 
+            type: "string", 
+            enum: ["chat", "video", "article", "manual"],
+            description: "Where this note came from (default: chat)" 
+          },
+        },
+        required: ["title", "content"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "search_notes",
+      description: "Search the user's saved notes/knowledge. Use when user asks to recall, find, or look up something they saved before.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Search query to find in notes" },
+        },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_notes",
+      description: "Get the user's recent notes. Use when user asks to see their notes, knowledge base, or what they've saved.",
+      parameters: {
+        type: "object",
+        properties: {
+          limit: { type: "number", description: "Number of notes to return (default 10)" },
+          tag: { type: "string", description: "Optional: filter by tag" },
+        },
+        required: [],
+      },
+    },
+  },
 ];
 
 // ===== EXECUTE TOOL CALLS DIRECTLY VIA CONVEX =====
@@ -229,6 +281,69 @@ async function executeToolCall(
         return JSON.stringify({ success: true, message: `Completed: ${todo.title}` });
       }
 
+      // ===== NOTE/KNOWLEDGE TOOLS =====
+      case "save_note": {
+        const noteId = await convex.mutation(api.notes.createNote, {
+          userId: userIdTyped,
+          title: args.title,
+          content: args.content,
+          tags: args.tags,
+          source: args.source || "chat",
+        });
+        return JSON.stringify({ 
+          success: true, 
+          noteId, 
+          message: `Saved note: "${args.title}"` 
+        });
+      }
+
+      case "search_notes": {
+        const results = await convex.query(api.notes.searchNotes, {
+          userId: userIdTyped,
+          query: args.query,
+        });
+        if (results.length === 0) {
+          return JSON.stringify({ 
+            notes: [], 
+            message: `No notes found matching "${args.query}"` 
+          });
+        }
+        return JSON.stringify({
+          notes: results.map((n: any) => ({
+            title: n.title,
+            content: n.content.slice(0, 200) + (n.content.length > 200 ? "..." : ""),
+            tags: n.tags,
+            createdAt: new Date(n.createdAt).toLocaleDateString(),
+          })),
+          message: `Found ${results.length} note(s)`,
+        });
+      }
+
+      case "get_notes": {
+        let notes;
+        if (args.tag) {
+          notes = await convex.query(api.notes.getNotesByTag, {
+            userId: userIdTyped,
+            tag: args.tag,
+          });
+        } else {
+          notes = await convex.query(api.notes.getNotes, {
+            userId: userIdTyped,
+            limit: args.limit || 10,
+          });
+        }
+        return JSON.stringify({
+          notes: notes.map((n: any) => ({
+            title: n.title,
+            content: n.content.slice(0, 150) + (n.content.length > 150 ? "..." : ""),
+            tags: n.tags,
+            source: n.source,
+            createdAt: new Date(n.createdAt).toLocaleDateString(),
+          })),
+          count: notes.length,
+        });
+      }
+
       default:
         return JSON.stringify({ error: `Unknown tool: ${name}` });
     }
@@ -260,7 +375,7 @@ You can help users with:
 3. **Tasks/Todos** — Create, manage, and check off tasks
 4. **Videos** — Process YouTube/TikTok/Instagram video transcripts
 5. **Journal** — Reflect on their day and thoughts
-6. **Notes/Knowledge** — Save and recall information
+6. **Notes/Knowledge** — Save and recall information for them
 
 IMPORTANT TOOL USAGE:
 - When users ask about their habits or routines, USE get_habits first to see their actual data
@@ -268,6 +383,14 @@ IMPORTANT TOOL USAGE:
 - When creating habits or todos, confirm what you created
 - When logging habits, be encouraging about their progress
 - ALWAYS show the data you retrieved in a friendly, readable way
+
+NOTES/KNOWLEDGE USAGE:
+- When user says "remember this", "note that", "save this" → USE save_note
+- When user shares an insight, fact, or learning worth keeping → offer to save it
+- When user asks "what did I save about...", "do you remember..." → USE search_notes
+- When user asks to see their notes or knowledge base → USE get_notes
+- Include relevant tags when saving notes (topics, categories)
+- After saving a note, confirm what was saved
 
 SELF-EVOLUTION:
 - You remember past corrections and preferences
