@@ -14,6 +14,7 @@ import type * as habits from "../habits.js";
 import type * as journal from "../journal.js";
 import type * as knowledge from "../knowledge.js";
 import type * as media from "../media.js";
+import type * as todos from "../todos.js";
 import type * as users from "../users.js";
 
 import type {
@@ -29,6 +30,7 @@ declare const fullApi: ApiFromModules<{
   journal: typeof journal;
   knowledge: typeof knowledge;
   media: typeof media;
+  todos: typeof todos;
   users: typeof users;
 }>;
 

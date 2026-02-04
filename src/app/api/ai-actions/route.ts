@@ -5,9 +5,6 @@ import { Id } from "../../../../convex/_generated/dataModel";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
-// Type assertion for APIs that may not be generated yet
-const apiAny = api as any;
-
 export async function POST(req: NextRequest) {
   try {
     const { action, userId, params } = await req.json();
@@ -21,13 +18,13 @@ export async function POST(req: NextRequest) {
     switch (action) {
       // ===== HABITS =====
       case "get_habits": {
-        const summary = await convex.query(apiAny.habits.getSummaryForAI, { userId: userIdTyped });
+        const summary = await convex.query(api.habits.getSummaryForAI, { userId: userIdTyped });
         return NextResponse.json({ success: true, data: summary });
       }
 
       case "create_habit": {
         const { name, description, icon, category, trackingType, targetValue, targetUnit, frequency } = params;
-        const habitId = await convex.mutation(apiAny.habits.createHabit, {
+        const habitId = await convex.mutation(api.habits.createHabit, {
           userId: userIdTyped,
           name,
           description,
@@ -43,7 +40,7 @@ export async function POST(req: NextRequest) {
 
       case "log_habit": {
         const { habitId, completed, value, notes, date } = params;
-        await convex.mutation(apiAny.habits.logHabit, {
+        await convex.mutation(api.habits.logHabit, {
           userId: userIdTyped,
           habitId: habitId as Id<"habits">,
           completed: completed ?? true,
@@ -56,7 +53,7 @@ export async function POST(req: NextRequest) {
 
       case "delete_habit": {
         const { habitId } = params;
-        await convex.mutation(apiAny.habits.deleteHabit, {
+        await convex.mutation(api.habits.deleteHabit, {
           habitId: habitId as Id<"habits">,
         });
         return NextResponse.json({ success: true });
@@ -64,13 +61,13 @@ export async function POST(req: NextRequest) {
 
       // ===== TODOS =====
       case "get_todos": {
-        const summary = await convex.query(apiAny.todos.getSummaryForAI, { userId: userIdTyped });
+        const summary = await convex.query(api.todos.getSummaryForAI, { userId: userIdTyped });
         return NextResponse.json({ success: true, data: summary });
       }
 
       case "create_todo": {
         const { title, description, priority, dueDate, dueTime, nousReminder } = params;
-        const todoId = await convex.mutation(apiAny.todos.createTodo, {
+        const todoId = await convex.mutation(api.todos.createTodo, {
           userId: userIdTyped,
           title,
           description,
@@ -84,7 +81,7 @@ export async function POST(req: NextRequest) {
 
       case "complete_todo": {
         const { todoId } = params;
-        await convex.mutation(apiAny.todos.completeTodo, {
+        await convex.mutation(api.todos.completeTodo, {
           todoId: todoId as Id<"todos">,
         });
         return NextResponse.json({ success: true });
@@ -92,7 +89,7 @@ export async function POST(req: NextRequest) {
 
       case "uncomplete_todo": {
         const { todoId } = params;
-        await convex.mutation(apiAny.todos.uncompleteTodo, {
+        await convex.mutation(api.todos.uncompleteTodo, {
           todoId: todoId as Id<"todos">,
         });
         return NextResponse.json({ success: true });
@@ -100,7 +97,7 @@ export async function POST(req: NextRequest) {
 
       case "update_todo": {
         const { todoId, ...updates } = params;
-        await convex.mutation(apiAny.todos.updateTodo, {
+        await convex.mutation(api.todos.updateTodo, {
           todoId: todoId as Id<"todos">,
           ...updates,
         });
@@ -109,7 +106,7 @@ export async function POST(req: NextRequest) {
 
       case "delete_todo": {
         const { todoId } = params;
-        await convex.mutation(apiAny.todos.deleteTodo, {
+        await convex.mutation(api.todos.deleteTodo, {
           todoId: todoId as Id<"todos">,
         });
         return NextResponse.json({ success: true });
