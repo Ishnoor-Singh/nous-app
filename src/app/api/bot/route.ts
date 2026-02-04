@@ -62,16 +62,14 @@ const tools = [
   {
     type: "function" as const,
     function: {
-      name: "create_todo",
-      description: "Create a new task",
+      name: "create_smart_task",
+      description: "Create a task from natural language (auto-parses dates, priority, context). Use this for adding new tasks.",
       parameters: {
         type: "object",
         properties: {
-          title: { type: "string", description: "Title of the task" },
-          priority: { type: "string", enum: ["high", "medium", "low"] },
-          dueDate: { type: "string", description: "Due date YYYY-MM-DD" },
+          input: { type: "string", description: "Natural language task description, e.g. 'Call mom tomorrow at 3pm high priority @phone'" },
         },
-        required: ["title"],
+        required: ["input"],
       },
     },
   },
@@ -87,6 +85,38 @@ const tools = [
         },
         required: ["todoTitle"],
       },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "get_projects",
+      description: "Get user's projects for task organization",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "create_project",
+      description: "Create a new project to organize tasks",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Project name" },
+          description: { type: "string", description: "Project description" },
+          icon: { type: "string", description: "Emoji icon for the project" },
+        },
+        required: ["name"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "get_quick_wins",
+      description: "Get quick tasks that can be done in 15 minutes or less",
+      parameters: { type: "object", properties: {}, required: [] },
     },
   },
   {
@@ -148,14 +178,59 @@ async function executeToolCall(
         return JSON.stringify(data);
       }
 
-      case "create_todo": {
-        const todoId = await convex.mutation(api.todos.createTodo, {
-          userId,
-          title: args.title,
-          priority: args.priority || "medium",
-          dueDate: args.dueDate,
-        });
-        return JSON.stringify({ success: true, todoId, message: `Created: ${args.title}` });
+      case "create_smart_task": {
+        // Parse the natural language input first
+        try {
+          const parseResponse = await fetch(
+            `${process.env.NEXT_PUBLIC_APP_URL || 'https://nous-app-gules.vercel.app'}/api/parse-task`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ input: args.input }),
+            }
+          );
+          
+          if (!parseResponse.ok) {
+            // Fallback to simple creation
+            const todoId = await convex.mutation(api.todos.createTodo, {
+              userId,
+              title: args.input,
+              priority: "medium",
+            });
+            return JSON.stringify({ success: true, todoId, message: `Created: ${args.input}` });
+          }
+          
+          const parsed = await parseResponse.json();
+          
+          const todoId = await convex.mutation(api.todos.createTodo, {
+            userId,
+            title: parsed.title || args.input,
+            priority: parsed.priority || "medium",
+            dueDate: parsed.dueDate || undefined,
+            dueTime: parsed.dueTime || undefined,
+          });
+          
+          let message = `Created: ${parsed.title}`;
+          if (parsed.dueDate) message += ` (due ${parsed.dueDate}`;
+          if (parsed.dueTime) message += ` at ${parsed.dueTime}`;
+          if (parsed.dueDate) message += ')';
+          if (parsed.context) message += ` [${parsed.context}]`;
+          
+          return JSON.stringify({ 
+            success: true, 
+            todoId, 
+            message,
+            parsed,
+          });
+        } catch (e) {
+          // Fallback to simple creation
+          const todoId = await convex.mutation(api.todos.createTodo, {
+            userId,
+            title: args.input,
+            priority: "medium",
+          });
+          return JSON.stringify({ success: true, todoId, message: `Created: ${args.input}` });
+        }
       }
 
       case "complete_todo": {
@@ -170,14 +245,61 @@ async function executeToolCall(
         return JSON.stringify({ success: true, message: `Completed: ${todo.title}` });
       }
 
+      case "get_projects": {
+        const projects = await convex.query(api.smartTasks.getProjects, { userId });
+        return JSON.stringify({
+          projects: projects.map((p: any) => ({
+            name: p.name,
+            icon: p.icon,
+            status: p.status,
+            totalTasks: p.totalTasks,
+            completedTasks: p.completedTasks,
+          })),
+        });
+      }
+
+      case "create_project": {
+        const projectId = await convex.mutation(api.smartTasks.createProject, {
+          userId,
+          name: args.name,
+          description: args.description,
+          icon: args.icon || "📁",
+        });
+        return JSON.stringify({ 
+          success: true, 
+          projectId, 
+          message: `Created project: ${args.icon || "📁"} ${args.name}` 
+        });
+      }
+
+      case "get_quick_wins": {
+        const todos = await convex.query(api.todos.getTodos, { userId });
+        const quickTasks = todos.filter((t: any) => 
+          !t.completed && (t.estimatedMinutes ?? 30) <= 15
+        );
+        return JSON.stringify({
+          quickWins: quickTasks.map((t: any) => ({
+            title: t.title,
+            priority: t.priority,
+            estimatedMinutes: t.estimatedMinutes || 15,
+          })),
+          count: quickTasks.length,
+          message: quickTasks.length > 0 
+            ? `Found ${quickTasks.length} quick tasks you can knock out!`
+            : "No quick tasks right now. Want me to help you break down a bigger task?"
+        });
+      }
+
       case "get_daily_summary": {
-        const [habits, todos] = await Promise.all([
+        const [habits, todos, projects] = await Promise.all([
           convex.query(api.habits.getSummaryForAI, { userId }),
           convex.query(api.todos.getSummaryForAI, { userId }),
+          convex.query(api.smartTasks.getActiveProjects, { userId }),
         ]);
         return JSON.stringify({
           habits,
           todos,
+          activeProjects: projects?.length || 0,
           date: new Date().toISOString().split('T')[0],
         });
       }
@@ -212,7 +334,10 @@ YOUR NATURE:
 
 CAPABILITIES:
 - View and log habits
-- Create and manage todos
+- **Smart Tasks**: Create tasks from natural language (e.g., "remind me to call mom tomorrow at 3pm")
+  - Use create_smart_task - it auto-parses dates, times, priority, and context
+- Manage projects to organize tasks
+- Find quick wins (tasks under 15 min)
 - Add journal entries
 - Provide daily summaries
 - General chat and support
@@ -225,8 +350,14 @@ FORMATTING FOR MESSAGING:
   ⬜ Not done
 - Don't use markdown headers or complex formatting
 
+SMART TASK TIPS:
+- When user says "remind me to..." or "add task..." → use create_smart_task
+- The parser understands: "tomorrow", "next monday", "at 3pm", "@home", "@work", "high priority"
+- Confirm what was created with the parsed details
+
 PROACTIVE BEHAVIORS:
 - If user seems to be checking in, offer a daily summary
+- Suggest quick wins when user has a few minutes
 - Encourage habit completion
 - Be supportive but not annoying
 
