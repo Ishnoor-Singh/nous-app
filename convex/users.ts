@@ -216,7 +216,7 @@ export const resetAccount = mutation({
     for (const habit of habits) {
       const logs = await ctx.db
         .query("habitLogs")
-        .withIndex("by_habit", (q) => q.eq("habitId", habit._id))
+        .withIndex("by_habit_date", (q) => q.eq("habitId", habit._id))
         .collect();
       for (const log of logs) {
         await ctx.db.delete(log._id);
@@ -278,12 +278,12 @@ export const resetAccount = mutation({
       await ctx.db.delete(capture._id);
     }
 
-    // Delete media items
-    const media = await ctx.db
-      .query("media")
+    // Delete saved media items
+    const savedMedia = await ctx.db
+      .query("savedMedia")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .collect();
-    for (const item of media) {
+    for (const item of savedMedia) {
       await ctx.db.delete(item._id);
     }
 

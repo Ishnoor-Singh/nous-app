@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
 
 // Get all notes for a user (most recent first)
 export const getNotes = query({
@@ -280,5 +281,212 @@ export const deleteNote = mutation({
   handler: async (ctx, args) => {
     await ctx.db.delete(args.noteId);
     return args.noteId;
+  },
+});
+
+// Get notes tree for sidebar (hierarchical structure)
+export const getNotesTree = query({
+  args: {
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const notes = await ctx.db
+      .query("notes")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
+    
+    // Filter out archived and return minimal data for tree
+    return notes
+      .filter((n) => !n.isArchived)
+      .map((n) => ({
+        _id: n._id,
+        title: n.title,
+        icon: n.icon,
+        parentId: n.parentId,
+        isPinned: n.isPinned,
+        createdAt: n.createdAt,
+        updatedAt: n.updatedAt,
+      }))
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+  },
+});
+
+// Get child notes
+export const getChildNotes = query({
+  args: {
+    parentId: v.id("notes"),
+  },
+  handler: async (ctx, args) => {
+    const children = await ctx.db
+      .query("notes")
+      .withIndex("by_parent", (q) => q.eq("parentId", args.parentId))
+      .collect();
+    
+    return children.filter((n) => !n.isArchived);
+  },
+});
+
+// Update note blocks (from tiptap editor)
+export const updateNoteBlocks = mutation({
+  args: {
+    noteId: v.id("notes"),
+    blocks: v.any(), // Tiptap JSON document
+    content: v.string(), // Plain text for search
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.noteId, {
+      blocks: args.blocks,
+      content: args.content,
+      updatedAt: Date.now(),
+    });
+    return args.noteId;
+  },
+});
+
+// Update note metadata (title, icon, etc)
+export const updateNoteMeta = mutation({
+  args: {
+    noteId: v.id("notes"),
+    title: v.optional(v.string()),
+    icon: v.optional(v.string()),
+    coverImage: v.optional(v.string()),
+    parentId: v.optional(v.id("notes")),
+  },
+  handler: async (ctx, args) => {
+    const updates: Record<string, unknown> = {
+      updatedAt: Date.now(),
+    };
+    
+    if (args.title !== undefined) updates.title = args.title;
+    if (args.icon !== undefined) updates.icon = args.icon;
+    if (args.coverImage !== undefined) updates.coverImage = args.coverImage;
+    if (args.parentId !== undefined) updates.parentId = args.parentId;
+    
+    await ctx.db.patch(args.noteId, updates);
+    return args.noteId;
+  },
+});
+
+// Find note by title (for backlinks)
+export const findNoteByTitle = query({
+  args: {
+    userId: v.id("users"),
+    title: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const notes = await ctx.db
+      .query("notes")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
+    
+    // Case-insensitive match
+    const titleLower = args.title.toLowerCase();
+    return notes.find(
+      (n) => n.title.toLowerCase() === titleLower && !n.isArchived
+    );
+  },
+});
+
+// Update backlinks for a note
+export const updateBacklinks = mutation({
+  args: {
+    noteId: v.id("notes"),
+    outgoingLinks: v.array(v.id("notes")),
+  },
+  handler: async (ctx, args) => {
+    const note = await ctx.db.get(args.noteId);
+    if (!note) throw new Error("Note not found");
+    
+    // Get previous outgoing links
+    const previousLinks = note.outgoingLinks || [];
+    
+    // Remove this note from backlinks of notes no longer linked
+    for (const linkedId of previousLinks) {
+      if (!args.outgoingLinks.includes(linkedId)) {
+        const linkedNote = await ctx.db.get(linkedId);
+        if (linkedNote && linkedNote.backlinks) {
+          const newBacklinks = linkedNote.backlinks.filter((id) => id !== args.noteId);
+          await ctx.db.patch(linkedId, { backlinks: newBacklinks });
+        }
+      }
+    }
+    
+    // Add this note to backlinks of newly linked notes
+    for (const linkedId of args.outgoingLinks) {
+      if (!previousLinks.includes(linkedId)) {
+        const linkedNote = await ctx.db.get(linkedId);
+        if (linkedNote) {
+          const currentBacklinks = linkedNote.backlinks || [];
+          if (!currentBacklinks.includes(args.noteId)) {
+            await ctx.db.patch(linkedId, {
+              backlinks: [...currentBacklinks, args.noteId],
+            });
+          }
+        }
+      }
+    }
+    
+    // Update outgoing links on this note
+    await ctx.db.patch(args.noteId, {
+      outgoingLinks: args.outgoingLinks,
+      updatedAt: Date.now(),
+    });
+    
+    return args.noteId;
+  },
+});
+
+// Get backlinks for a note (with titles)
+export const getBacklinks = query({
+  args: {
+    noteId: v.id("notes"),
+  },
+  handler: async (ctx, args) => {
+    const note = await ctx.db.get(args.noteId);
+    if (!note) return [];
+    
+    const backlinks = note.backlinks || [];
+    const linkedNotes = await Promise.all(
+      backlinks.map(async (id) => {
+        const linkedNote = await ctx.db.get(id);
+        if (!linkedNote || linkedNote.isArchived) return null;
+        return {
+          _id: linkedNote._id,
+          title: linkedNote.title,
+          icon: linkedNote.icon,
+        };
+      })
+    );
+    
+    return linkedNotes.filter(Boolean);
+  },
+});
+
+// Create note with initial blocks
+export const createNoteWithBlocks = mutation({
+  args: {
+    userId: v.id("users"),
+    title: v.string(),
+    blocks: v.optional(v.any()),
+    content: v.optional(v.string()),
+    parentId: v.optional(v.id("notes")),
+    icon: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    
+    return await ctx.db.insert("notes", {
+      userId: args.userId,
+      title: args.title,
+      content: args.content || "",
+      blocks: args.blocks,
+      parentId: args.parentId,
+      icon: args.icon,
+      source: "manual",
+      isPinned: false,
+      isArchived: false,
+      createdAt: now,
+      updatedAt: now,
+    });
   },
 });

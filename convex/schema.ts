@@ -413,9 +413,19 @@ export default defineSchema({
   notes: defineTable({
     userId: v.id("users"),
     title: v.string(),
-    content: v.string(),
+    content: v.string(), // Plain text content (for search/mobile)
+    // Block-based content for desktop editor (tiptap JSON)
+    blocks: v.optional(v.any()), // Tiptap JSON document
+    // Hierarchy - for nested pages
+    parentId: v.optional(v.id("notes")),
+    // Backlinks - notes that link to this one (populated by system)
+    backlinks: v.optional(v.array(v.id("notes"))),
+    // Notes this links to (for [[wikilinks]])
+    outgoingLinks: v.optional(v.array(v.id("notes"))),
     // Organization
     tags: v.optional(v.array(v.string())),
+    icon: v.optional(v.string()), // Emoji icon for the note
+    coverImage: v.optional(v.string()), // Cover image URL
     source: v.optional(v.union(
       v.literal("chat"),      // Created via AI conversation
       v.literal("manual"),    // User typed directly
@@ -450,6 +460,7 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_user_pinned", ["userId", "isPinned"])
     .index("by_user_archived", ["userId", "isArchived"])
+    .index("by_parent", ["parentId"])
     .searchIndex("search_notes", {
       searchField: "content",
       filterFields: ["userId"],

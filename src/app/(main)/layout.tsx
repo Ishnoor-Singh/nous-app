@@ -84,8 +84,10 @@ export default function MainLayout({
       </aside>
 
       {/* Main Content - with left margin on desktop */}
-      <div className="lg:ml-64 pb-24 lg:pb-6 relative z-10">
-        <div className="max-w-4xl mx-auto">
+      <div className={`lg:ml-64 pb-24 lg:pb-6 relative z-10 ${
+        pathname === "/notes" ? "lg:pb-0" : ""
+      }`}>
+        <div className={pathname === "/notes" ? "" : "max-w-4xl mx-auto"}>
           {children}
         </div>
       </div>

@@ -3,7 +3,7 @@
 import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
@@ -17,14 +17,17 @@ import {
   Video,
   BookOpen,
   Sparkles,
-  MoreHorizontal,
   Trash2,
   X,
-  Filter,
   ChevronDown,
   Image as ImageIcon,
+  PanelRightClose,
+  PanelRightOpen,
+  MoreHorizontal,
+  ArrowLeft,
 } from "lucide-react";
 import { Id } from "../../../../convex/_generated/dataModel";
+import { BlockEditor, NoteSidebar, AIAssistant, BacklinksPanel } from "@/components/editor";
 import ImageUpload from "@/components/ImageUpload";
 
 // Source icons and colors
@@ -39,9 +42,292 @@ const SOURCE_CONFIG: Record<string, { icon: any; label: string; color: string }>
   import: { icon: FileText, label: "Import", color: "bg-gray-500/20 text-gray-400" },
 };
 
+export default function NotesPage() {
+  const { user } = useUser();
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  // Check if desktop
+  useEffect(() => {
+    const checkDesktop = () => setIsDesktop(window.innerWidth >= 1024);
+    checkDesktop();
+    window.addEventListener("resize", checkDesktop);
+    return () => window.removeEventListener("resize", checkDesktop);
+  }, []);
+
+  if (isDesktop) {
+    return <DesktopNotesView />;
+  }
+  
+  return <MobileNotesView />;
+}
+
+// ============================================
+// DESKTOP VIEW - Notion-like layout
+// ============================================
+function DesktopNotesView() {
+  const { user } = useUser();
+  const userData = useQuery(api.users.getUserWithState, {
+    clerkId: user?.id || "",
+  });
+
+  const notesTree = useQuery(api.notes.getNotesTree, {
+    userId: userData?.user?._id || ("" as any),
+  });
+
+  const [selectedNoteId, setSelectedNoteId] = useState<Id<"notes"> | null>(null);
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
+
+  const selectedNote = useQuery(
+    api.notes.getNote,
+    selectedNoteId ? { noteId: selectedNoteId } : "skip"
+  );
+
+  const backlinks = useQuery(
+    api.notes.getBacklinks,
+    selectedNoteId ? { noteId: selectedNoteId } : "skip"
+  );
+
+  const createNote = useMutation(api.notes.createNoteWithBlocks);
+  const updateBlocks = useMutation(api.notes.updateNoteBlocks);
+  const updateMeta = useMutation(api.notes.updateNoteMeta);
+  const deleteNote = useMutation(api.notes.deleteNote);
+  const togglePin = useMutation(api.notes.togglePinNote);
+
+  // Auto-select first note if none selected
+  useEffect(() => {
+    if (!selectedNoteId && notesTree && notesTree.length > 0) {
+      setSelectedNoteId(notesTree[0]._id);
+    }
+  }, [notesTree, selectedNoteId]);
+
+  const handleCreateNote = async (parentId?: Id<"notes">) => {
+    if (!userData?.user?._id) return;
+    
+    const noteId = await createNote({
+      userId: userData.user._id,
+      title: "Untitled",
+      parentId,
+    });
+    
+    setSelectedNoteId(noteId);
+  };
+
+  const handleDeleteNote = async (noteId: Id<"notes">) => {
+    await deleteNote({ noteId });
+    if (selectedNoteId === noteId) {
+      const remaining = notesTree?.filter((n) => n._id !== noteId);
+      setSelectedNoteId(remaining?.[0]?._id || null);
+    }
+  };
+
+  const handleEditorChange = useCallback(
+    async (json: any, text: string) => {
+      if (!selectedNoteId) return;
+      await updateBlocks({
+        noteId: selectedNoteId,
+        blocks: json,
+        content: text,
+      });
+    },
+    [selectedNoteId, updateBlocks]
+  );
+
+  const handleTitleChange = useCallback(
+    async (title: string) => {
+      if (!selectedNoteId) return;
+      await updateMeta({
+        noteId: selectedNoteId,
+        title,
+      });
+    },
+    [selectedNoteId, updateMeta]
+  );
+
+  const handleIconChange = useCallback(
+    async (icon: string) => {
+      if (!selectedNoteId) return;
+      await updateMeta({
+        noteId: selectedNoteId,
+        icon,
+      });
+    },
+    [selectedNoteId, updateMeta]
+  );
+
+  if (!userData?.user) {
+    return (
+      <div className="min-h-dvh flex items-center justify-center">
+        <div className="w-12 h-12 rounded-full border-2 border-accent border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-[calc(100vh-0px)] flex overflow-hidden -mx-4 lg:-mx-0 lg:-ml-64">
+      {/* Left Sidebar - Notes Tree */}
+      <div className="w-64 flex-shrink-0 glass-nav border-r border-white/10">
+        <NoteSidebar
+          notes={notesTree || []}
+          selectedNoteId={selectedNoteId || undefined}
+          onSelectNote={setSelectedNoteId}
+          onCreateNote={handleCreateNote}
+          onDeleteNote={handleDeleteNote}
+        />
+      </div>
+
+      {/* Main Editor Area */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {selectedNote ? (
+          <>
+            {/* Top Bar */}
+            <div className="flex items-center justify-between px-6 py-3 border-b border-white/10 glass-nav">
+              {/* Breadcrumb */}
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-white/40">Notes</span>
+                <span className="text-white/40">/</span>
+                <span className="text-white font-medium truncate max-w-[200px]">
+                  {selectedNote.title || "Untitled"}
+                </span>
+              </div>
+              
+              {/* Actions */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => togglePin({ noteId: selectedNoteId! })}
+                  className={`p-2 rounded-lg transition-all ${
+                    selectedNote.isPinned
+                      ? "bg-accent/20 text-accent"
+                      : "hover:bg-white/10 text-white/50"
+                  }`}
+                  title={selectedNote.isPinned ? "Unpin" : "Pin"}
+                >
+                  <Pin className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setAiPanelOpen(!aiPanelOpen)}
+                  className={`p-2 rounded-lg transition-all ${
+                    aiPanelOpen
+                      ? "bg-accent/20 text-accent"
+                      : "hover:bg-white/10 text-white/50"
+                  }`}
+                  title="AI Assistant"
+                >
+                  {aiPanelOpen ? (
+                    <PanelRightClose className="w-4 h-4" />
+                  ) : (
+                    <PanelRightOpen className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Editor Container */}
+            <div className="flex-1 overflow-y-auto">
+              <div className="max-w-3xl mx-auto px-8 py-8">
+                {/* Icon + Title */}
+                <div className="mb-6">
+                  {/* Icon picker */}
+                  <div className="mb-2">
+                    <button
+                      onClick={() => {
+                        const emoji = prompt("Enter an emoji for this note:", selectedNote.icon || "📄");
+                        if (emoji) handleIconChange(emoji);
+                      }}
+                      className="text-4xl hover:bg-white/10 p-2 rounded-lg transition-all"
+                      title="Change icon"
+                    >
+                      {selectedNote.icon || "📄"}
+                    </button>
+                  </div>
+                  
+                  {/* Title */}
+                  <input
+                    type="text"
+                    value={selectedNote.title || ""}
+                    onChange={(e) => handleTitleChange(e.target.value)}
+                    placeholder="Untitled"
+                    className="w-full text-4xl font-bold text-white bg-transparent border-none outline-none placeholder-white/30"
+                  />
+                  
+                  {/* Meta info */}
+                  <div className="flex items-center gap-4 mt-2 text-sm text-white/40">
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {new Date(selectedNote.updatedAt).toLocaleDateString()}
+                    </span>
+                    {selectedNote.tags && selectedNote.tags.length > 0 && (
+                      <div className="flex items-center gap-1">
+                        <Tag className="w-3 h-3" />
+                        {selectedNote.tags.join(", ")}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Block Editor */}
+                <BlockEditor
+                  content={selectedNote.blocks || selectedNote.content}
+                  onChange={handleEditorChange}
+                  placeholder="Start writing, or press '/' for commands..."
+                />
+
+                {/* Backlinks */}
+                {backlinks && backlinks.length > 0 && (
+                  <BacklinksPanel
+                    backlinks={backlinks as any}
+                    onNavigate={(noteId) => setSelectedNoteId(noteId)}
+                  />
+                )}
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full glass-card flex items-center justify-center">
+                <FileText className="w-8 h-8 text-white/30" />
+              </div>
+              <p className="text-white/50 mb-4">Select a note or create a new one</p>
+              <button
+                onClick={() => handleCreateNote()}
+                className="px-4 py-2 rounded-lg glass-accent text-white text-sm flex items-center gap-2 mx-auto"
+              >
+                <Plus className="w-4 h-4" />
+                New Note
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Right Sidebar - AI Assistant */}
+      <AnimatePresence>
+        {aiPanelOpen && (
+          <motion.div
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: 320, opacity: 1 }}
+            exit={{ width: 0, opacity: 0 }}
+            className="flex-shrink-0 overflow-hidden"
+          >
+            <AIAssistant
+              noteTitle={selectedNote?.title || ""}
+              noteContent={selectedNote?.content || ""}
+              isCollapsed={false}
+              onToggle={() => setAiPanelOpen(false)}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ============================================
+// MOBILE VIEW - Original card-based layout
+// ============================================
 type ViewMode = "all" | "pinned" | "archived";
 
-export default function NotesPage() {
+function MobileNotesView() {
   const { user } = useUser();
   const userData = useQuery(api.users.getUserWithState, {
     clerkId: user?.id || "",
@@ -61,7 +347,6 @@ export default function NotesPage() {
   });
 
   const createNote = useMutation(api.notes.createNote);
-  const updateNote = useMutation(api.notes.updateNote);
   const togglePin = useMutation(api.notes.togglePinNote);
   const archiveNote = useMutation(api.notes.archiveNote);
   const deleteNote = useMutation(api.notes.deleteNote);
