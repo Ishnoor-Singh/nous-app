@@ -208,26 +208,35 @@ export default function HabitsPage() {
             </motion.div>
             <h3 className="text-2xl font-bold text-white mb-3">No habits yet</h3>
             <p className="text-white/50 mb-8 max-w-xs mx-auto">
-              Start tracking your daily habits. Add your own or try a preset challenge.
+              Start small! Track one habit at a time and build from there.
             </p>
             <div className="space-y-3">
-              <motion.button
-                onClick={handleSetup75Hard}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="w-full max-w-xs mx-auto px-6 py-4 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-xl font-semibold flex items-center justify-center gap-2 glow-warning"
-              >
-                <Trophy className="w-5 h-5" />
-                Start 75 Hard Challenge
-              </motion.button>
               <motion.button
                 onClick={() => setShowAdd(true)}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                className="w-full max-w-xs mx-auto px-6 py-4 glass-button text-white rounded-xl font-semibold"
+                className="w-full max-w-xs mx-auto px-6 py-4 bg-gradient-to-r from-accent to-purple-600 text-white rounded-xl font-semibold flex items-center justify-center gap-2"
+                style={{ boxShadow: "0 0 20px rgba(99, 102, 241, 0.3)" }}
               >
-                Add Custom Habit
+                <Plus className="w-5 h-5" />
+                Create Your First Habit
               </motion.button>
+              <details className="w-full max-w-xs mx-auto">
+                <summary className="text-white/40 text-sm cursor-pointer hover:text-white/60 transition-colors text-center py-2">
+                  Or try a preset challenge...
+                </summary>
+                <motion.button
+                  onClick={handleSetup75Hard}
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="w-full mt-2 px-6 py-3 bg-gradient-to-r from-orange-500/20 to-red-500/20 border border-orange-500/30 text-orange-300 rounded-xl font-medium flex items-center justify-center gap-2 text-sm"
+                >
+                  <Trophy className="w-4 h-4" />
+                  75 Hard Challenge (Advanced)
+                </motion.button>
+              </details>
             </div>
           </motion.div>
         )}
