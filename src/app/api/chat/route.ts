@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { ChatCompletionMessageParam, ChatCompletionTool } from "openai/resources/chat/completions";
+import { ConvexHttpClient } from "convex/browser";
+import { api } from "../../../../convex/_generated/api";
+import { Id } from "../../../../convex/_generated/dataModel";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 // Supadata API for video transcripts
 const SUPADATA_API_KEY = process.env.SUPADATA_API_KEY || "sd_f05cfbfebf323d56da8a9b1b2ea92869";
@@ -137,36 +142,77 @@ const tools: ChatCompletionTool[] = [
   },
 ];
 
-// ===== EXECUTE TOOL CALLS =====
+// ===== EXECUTE TOOL CALLS DIRECTLY VIA CONVEX =====
 async function executeToolCall(
   name: string,
   args: Record<string, any>,
   userId: string
 ): Promise<string> {
-  const baseUrl = process.env.VERCEL_URL 
-    ? `https://${process.env.VERCEL_URL}` 
-    : process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-  
   try {
-    const response = await fetch(`${baseUrl}/api/ai-actions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: name,
-        userId,
-        params: args,
-      }),
-    });
-    
-    const result = await response.json();
-    
-    if (result.error) {
-      return JSON.stringify({ error: result.error });
+    const userIdTyped = userId as Id<"users">;
+
+    switch (name) {
+      case "get_habits": {
+        const data = await convex.query(api.habits.getSummaryForAI, { userId: userIdTyped });
+        return JSON.stringify(data);
+      }
+
+      case "create_habit": {
+        const habitId = await convex.mutation(api.habits.createHabit, {
+          userId: userIdTyped,
+          name: args.name,
+          description: args.description,
+          icon: args.icon || "✨",
+          category: args.category || "custom",
+          trackingType: args.trackingType || "boolean",
+          targetValue: args.targetValue,
+          targetUnit: args.targetUnit,
+          frequency: args.frequency || "daily",
+        });
+        return JSON.stringify({ success: true, habitId, message: `Created habit: ${args.name}` });
+      }
+
+      case "log_habit": {
+        await convex.mutation(api.habits.logHabit, {
+          userId: userIdTyped,
+          habitId: args.habitId as Id<"habits">,
+          completed: args.completed ?? true,
+          value: args.value,
+          notes: args.notes,
+        });
+        return JSON.stringify({ success: true, message: "Habit logged!" });
+      }
+
+      case "get_todos": {
+        const data = await convex.query(api.todos.getSummaryForAI, { userId: userIdTyped });
+        return JSON.stringify(data);
+      }
+
+      case "create_todo": {
+        const todoId = await convex.mutation(api.todos.createTodo, {
+          userId: userIdTyped,
+          title: args.title,
+          description: args.description,
+          priority: args.priority,
+          dueDate: args.dueDate,
+          dueTime: args.dueTime,
+        });
+        return JSON.stringify({ success: true, todoId, message: `Created task: ${args.title}` });
+      }
+
+      case "complete_todo": {
+        await convex.mutation(api.todos.completeTodo, {
+          todoId: args.todoId as Id<"todos">,
+        });
+        return JSON.stringify({ success: true, message: "Task marked complete!" });
+      }
+
+      default:
+        return JSON.stringify({ error: `Unknown tool: ${name}` });
     }
-    
-    return JSON.stringify(result.data || { success: true, ...result });
   } catch (error: any) {
-    return JSON.stringify({ error: error.message });
+    console.error(`Tool ${name} error:`, error);
+    return JSON.stringify({ error: error.message || "Tool execution failed" });
   }
 }
 
