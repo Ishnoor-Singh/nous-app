@@ -6,7 +6,7 @@ import { api } from "../../../../convex/_generated/api";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  Flame, Plus, Check, ChevronRight, 
+  Flame, Plus, Check, 
   Sparkles, Target, Trophy, X
 } from "lucide-react";
 import { Id } from "../../../../convex/_generated/dataModel";
@@ -305,7 +305,13 @@ function HabitCard({ habit, onToggle }: { habit: any; onToggle: () => void }) {
           )}
         </div>
 
-        <ChevronRight className="w-5 h-5 text-white/30" />
+        {/* Streak indicator */}
+        {habit.currentStreak > 0 && (
+          <div className="flex items-center gap-1 text-orange-400">
+            <Flame className="w-4 h-4" />
+            <span className="text-sm font-medium">{habit.currentStreak}</span>
+          </div>
+        )}
       </div>
     </motion.div>
   );
