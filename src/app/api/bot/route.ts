@@ -461,7 +461,7 @@ export async function POST(req: NextRequest) {
     } else if (identifierType === "clerkId") {
       // Direct clerkId lookup (useful for integrations that already have it)
       clerkId = userIdentifier;
-      user = await convex.query(api.users.getUser, { clerkId });
+      user = await convex.query(api.users.getUser, { clerkId: clerkId! });
     } else {
       return NextResponse.json(
         { error: "Phone lookup not implemented yet. Use email or clerkId." },
