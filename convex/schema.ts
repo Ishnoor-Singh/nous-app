@@ -198,13 +198,51 @@ export default defineSchema({
     dueTime: v.optional(v.string()), // HH:MM
     completed: v.boolean(),
     completedAt: v.optional(v.number()),
+    // Project & context (GTD-style)
+    projectId: v.optional(v.id("projects")),
+    context: v.optional(v.union(
+      v.literal("home"),
+      v.literal("work"),
+      v.literal("errands"),
+      v.literal("phone"),
+      v.literal("computer"),
+      v.literal("anywhere"),
+    )),
+    // Time estimates
+    estimatedMinutes: v.optional(v.number()),
+    actualMinutes: v.optional(v.number()),
+    // Dependencies - blocked by other tasks
+    blockedBy: v.optional(v.array(v.id("todos"))),
+    // Recurrence
+    isRecurring: v.optional(v.boolean()),
+    recurrence: v.optional(v.object({
+      pattern: v.union(
+        v.literal("daily"),
+        v.literal("weekdays"),
+        v.literal("weekly"),
+        v.literal("biweekly"),
+        v.literal("monthly"),
+      ),
+      interval: v.optional(v.number()), // every N periods
+      daysOfWeek: v.optional(v.array(v.number())), // 0-6 for weekly
+      dayOfMonth: v.optional(v.number()), // 1-31 for monthly
+      endDate: v.optional(v.string()), // When to stop recurring
+    })),
+    parentTaskId: v.optional(v.id("todos")), // For recurring: link to template
     // Nous accountability
     nousReminder: v.optional(v.boolean()), // should Nous check in about this?
     reminderSent: v.optional(v.boolean()),
+    // Energy level (for smart scheduling)
+    energyRequired: v.optional(v.union(
+      v.literal("high"),
+      v.literal("medium"),
+      v.literal("low"),
+    )),
     createdAt: v.number(),
   })
     .index("by_user", ["userId"])
-    .index("by_user_due", ["userId", "dueDate"]),
+    .index("by_user_due", ["userId", "dueDate"])
+    .index("by_project", ["projectId"]),
 
   // Journal entries with AI assistance
   journalEntries: defineTable({
@@ -295,4 +333,66 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_user_date", ["userId", "date"]),
+
+  // Projects - group related tasks
+  projects: defineTable({
+    userId: v.id("users"),
+    name: v.string(),
+    description: v.optional(v.string()),
+    color: v.optional(v.string()), // hex color
+    icon: v.optional(v.string()), // emoji
+    status: v.union(
+      v.literal("active"),
+      v.literal("completed"),
+      v.literal("archived"),
+    ),
+    // Progress tracking
+    totalTasks: v.number(),
+    completedTasks: v.number(),
+    // Dates
+    dueDate: v.optional(v.string()), // YYYY-MM-DD
+    createdAt: v.number(),
+    completedAt: v.optional(v.number()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_status", ["userId", "status"]),
+
+  // Quick capture inbox - unprocessed thoughts/tasks
+  quickCapture: defineTable({
+    userId: v.id("users"),
+    content: v.string(), // Raw text input
+    // AI-parsed interpretation
+    parsedType: v.optional(v.union(
+      v.literal("task"),
+      v.literal("note"),
+      v.literal("reminder"),
+      v.literal("idea"),
+      v.literal("unknown"),
+    )),
+    parsedData: v.optional(v.object({
+      title: v.optional(v.string()),
+      dueDate: v.optional(v.string()),
+      dueTime: v.optional(v.string()),
+      priority: v.optional(v.string()),
+      context: v.optional(v.string()),
+      project: v.optional(v.string()),
+    })),
+    // Processing status
+    status: v.union(
+      v.literal("pending"),
+      v.literal("processed"),
+      v.literal("dismissed"),
+    ),
+    processedAs: v.optional(v.union(
+      v.literal("todo"),
+      v.literal("journal"),
+      v.literal("note"),
+      v.literal("dismissed"),
+    )),
+    linkedId: v.optional(v.string()), // ID of created todo/note
+    createdAt: v.number(),
+    processedAt: v.optional(v.number()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_status", ["userId", "status"]),
 });
