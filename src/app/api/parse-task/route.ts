@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
+import { getOpenAI } from "@/lib/clients";
+
 
 /**
  * Natural Language Task Parser
@@ -12,9 +13,6 @@ import OpenAI from "openai";
  * - "Water plants every monday" → recurring task
  */
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
 
 // Get current date info for relative date parsing
 function getDateContext() {
@@ -89,7 +87,7 @@ export async function POST(req: NextRequest) {
       `Today is ${dateContext.dayOfWeek}, ${dateContext.month} ${dateContext.dayNum}, ${dateContext.year} (${dateContext.today}). Current time: ${dateContext.time}.`
     );
 
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         { role: "system", content: systemPrompt },

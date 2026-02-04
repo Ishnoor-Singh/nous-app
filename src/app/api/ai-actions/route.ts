@@ -1,16 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ConvexHttpClient } from "convex/browser";
 import { api } from "../../../../convex/_generated/api";
 import { Id } from "../../../../convex/_generated/dataModel";
-
-// Lazy initialization to avoid build-time errors
-let convex: ConvexHttpClient | null = null;
-function getConvex() {
-  if (!convex) {
-    convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
-  }
-  return convex;
-}
+import { getConvex } from "@/lib/clients";
 
 export async function POST(req: NextRequest) {
   try {

@@ -1,22 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
 import { ChatCompletionMessageParam, ChatCompletionTool } from "openai/resources/chat/completions";
-import { ConvexHttpClient } from "convex/browser";
 import { api } from "../../../../convex/_generated/api";
 import { Id } from "../../../../convex/_generated/dataModel";
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-// Lazy initialization to avoid build-time errors
-let convex: ConvexHttpClient | null = null;
-function getConvex() {
-  if (!convex) {
-    convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
-  }
-  return convex;
-}
+import { getOpenAI, getConvex } from "@/lib/clients";
 
 // Supadata API for video transcripts
 const SUPADATA_API_KEY = process.env.SUPADATA_API_KEY || "sd_f05cfbfebf323d56da8a9b1b2ea92869";
@@ -581,7 +567,7 @@ async function executeToolCall(
           source = "video";
           
           // Generate summary using OpenAI
-          const summaryResponse = await openai.chat.completions.create({
+          const summaryResponse = await getOpenAI().chat.completions.create({
             model: "gpt-4o-mini",
             messages: [
               {
@@ -632,7 +618,7 @@ Format your response as JSON:
           source = "article";
           
           // Generate summary using OpenAI
-          const summaryResponse = await openai.chat.completions.create({
+          const summaryResponse = await getOpenAI().chat.completions.create({
             model: "gpt-4o-mini",
             messages: [
               {
@@ -846,7 +832,7 @@ export async function POST(req: NextRequest) {
     // Initial API call with tools (use gpt-4o for vision when image present)
     const model = imageUrl ? "gpt-4o" : "gpt-4o-mini";
     
-    let response = await openai.chat.completions.create({
+    let response = await getOpenAI().chat.completions.create({
       model,
       messages: [
         { role: "system", content: buildSystemPrompt(emotionalState, videoContext, memoryContext) + (imageUrl ? "\n\nThe user has shared an image. Describe what you see and engage with it naturally. You can comment on it, ask questions about it, or relate it to your conversation." : "") },
@@ -891,7 +877,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Get final response with tool results
-      response = await openai.chat.completions.create({
+      response = await getOpenAI().chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
           { role: "system", content: buildSystemPrompt(emotionalState, videoContext) },

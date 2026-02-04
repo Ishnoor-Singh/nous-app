@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
+import { getOpenAI } from "@/lib/clients";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+
 
 // Topic-specific prompts for generating engaging knowledge cards
 const TOPIC_PROMPTS: Record<string, string> = {
@@ -34,7 +32,7 @@ export async function POST(req: NextRequest) {
 
     const topicPrompt = TOPIC_PROMPTS[topic] || TOPIC_PROMPTS.philosophy;
 
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {

@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
+import { getOpenAI } from "@/lib/clients";
+
 import { Supadata, SupadataError } from "@supadata/js";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
 
 const supadata = new Supadata({
   apiKey: process.env.SUPADATA_API_KEY!,
@@ -81,7 +79,7 @@ export async function POST(request: Request) {
 
     // If we have transcript content, summarize it
     if (transcript) {
-      const response = await openai.chat.completions.create({
+      const response = await getOpenAI().chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
           {

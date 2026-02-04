@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
-import { ConvexHttpClient } from "convex/browser";
 import { clerkClient } from "@clerk/nextjs/server";
 import { api } from "../../../../convex/_generated/api";
 import { Id } from "../../../../convex/_generated/dataModel";
+import { getOpenAI, getConvex } from "@/lib/clients";
 
 /**
  * BOT API - External Interface for Nous
@@ -17,19 +16,6 @@ import { Id } from "../../../../convex/_generated/dataModel";
  * - User identification by phone number or email
  * - Proactive message support (bot can initiate)
  */
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-// Lazy initialization to avoid build-time errors
-let convex: ConvexHttpClient | null = null;
-function getConvex() {
-  if (!convex) {
-    convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
-  }
-  return convex;
-}
 
 // Simple API key auth for bot access
 const BOT_API_KEY = process.env.NOUS_BOT_API_KEY || "nous-bot-dev-key";
@@ -648,7 +634,7 @@ async function executeToolCall(
           content = result.text;
           source = "video";
           
-          const summaryResponse = await openai.chat.completions.create({
+          const summaryResponse = await getOpenAI().chat.completions.create({
             model: "gpt-4o-mini",
             messages: [
               {
@@ -679,7 +665,7 @@ async function executeToolCall(
           content = result.content;
           source = "article";
           
-          const summaryResponse = await openai.chat.completions.create({
+          const summaryResponse = await getOpenAI().chat.completions.create({
             model: "gpt-4o-mini",
             messages: [
               {
@@ -868,7 +854,7 @@ export async function POST(req: NextRequest) {
     ];
 
     // Call OpenAI with tools
-    let response = await openai.chat.completions.create({
+    let response = await getOpenAI().chat.completions.create({
       model: "gpt-4o-mini",
       messages,
       tools,
@@ -903,7 +889,7 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      response = await openai.chat.completions.create({
+      response = await getOpenAI().chat.completions.create({
         model: "gpt-4o-mini",
         messages: [...messages, ...toolMessages],
         temperature: 0.8,
