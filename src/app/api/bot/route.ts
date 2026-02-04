@@ -27,6 +27,155 @@ const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 // Simple API key auth for bot access
 const BOT_API_KEY = process.env.NOUS_BOT_API_KEY || "nous-bot-dev-key";
 
+// Supadata API for video transcripts
+const SUPADATA_API_KEY = process.env.SUPADATA_API_KEY || "sd_f05cfbfebf323d56da8a9b1b2ea92869";
+
+// ===== URL DETECTION HELPERS =====
+interface DetectedUrl {
+  url: string;
+  type: "youtube" | "article" | "video" | "unknown";
+}
+
+function detectUrls(text: string): DetectedUrl[] {
+  const results: DetectedUrl[] = [];
+  
+  const youtubePatterns = [
+    /(https?:\/\/(?:www\.)?youtube\.com\/watch\?v=[a-zA-Z0-9_-]+[^\s]*)/g,
+    /(https?:\/\/youtu\.be\/[a-zA-Z0-9_-]+[^\s]*)/g,
+  ];
+  
+  const articlePatterns = [
+    /(https?:\/\/(?:www\.)?medium\.com\/[^\s]+)/g,
+    /(https?:\/\/[^\s]+\.substack\.com\/[^\s]+)/g,
+  ];
+  
+  const genericUrlPattern = /(https?:\/\/[^\s<>"\]]+)/g;
+  
+  for (const pattern of youtubePatterns) {
+    const matches = text.matchAll(pattern);
+    for (const match of matches) {
+      const url = match[1].split(/[\s\])"']/, 1)[0];
+      if (!results.find(r => r.url === url)) {
+        results.push({ url, type: "youtube" });
+      }
+    }
+  }
+  
+  for (const pattern of articlePatterns) {
+    const matches = text.matchAll(pattern);
+    for (const match of matches) {
+      const url = match[1].split(/[\s\])"']/, 1)[0];
+      if (!results.find(r => r.url === url)) {
+        results.push({ url, type: "article" });
+      }
+    }
+  }
+  
+  if (results.length === 0) {
+    const matches = text.matchAll(genericUrlPattern);
+    for (const match of matches) {
+      let url = match[1].split(/[\s\])"']/, 1)[0].replace(/[.,;:!?]+$/, '');
+      if (!results.find(r => r.url === url)) {
+        const hasPath = new URL(url).pathname.length > 1;
+        results.push({ url, type: hasPath ? "article" : "unknown" });
+      }
+    }
+  }
+  
+  return results;
+}
+
+async function fetchVideoTranscript(videoUrl: string): Promise<{ 
+  text: string | null; 
+  title?: string;
+  author?: string;
+  error?: string 
+}> {
+  try {
+    const infoResponse = await fetch(
+      `https://api.supadata.ai/v1/youtube/info?url=${encodeURIComponent(videoUrl)}`,
+      { headers: { "x-api-key": SUPADATA_API_KEY } }
+    );
+    
+    let title: string | undefined;
+    let author: string | undefined;
+    
+    if (infoResponse.ok) {
+      const info = await infoResponse.json();
+      title = info.title;
+      author = info.author || info.channel;
+    }
+    
+    const response = await fetch(
+      `https://api.supadata.ai/v1/transcript?url=${encodeURIComponent(videoUrl)}&text=true&mode=auto`,
+      { headers: { "x-api-key": SUPADATA_API_KEY } }
+    );
+    if (!response.ok) return { text: null, title, author, error: `api_error_${response.status}` };
+    const data = await response.json();
+    const text = data.content;
+    return { 
+      text: text.length > 12000 ? text.slice(0, 12000) + "..." : text,
+      title,
+      author,
+    };
+  } catch (error) {
+    return { text: null, error: "fetch_failed" };
+  }
+}
+
+async function fetchArticleContent(url: string): Promise<{
+  title: string | null;
+  content: string | null;
+  author?: string;
+  error?: string;
+}> {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; NousBot/1.0)",
+        "Accept": "text/html,application/xhtml+xml",
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+    
+    if (!response.ok) {
+      return { title: null, content: null, error: `fetch_error_${response.status}` };
+    }
+    
+    const html = await response.text();
+    
+    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    const title = titleMatch ? titleMatch[1].trim().replace(/\s*[-|–—]\s*[^-|–—]+$/, '') : null;
+    
+    const authorMatch = html.match(/<meta[^>]*name=["']author["'][^>]*content=["']([^"']+)["']/i);
+    const author = authorMatch ? authorMatch[1] : undefined;
+    
+    let content = html
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '')
+      .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '');
+    
+    const articleMatch = content.match(/<article[^>]*>([\s\S]*?)<\/article>/i);
+    const mainMatch = content.match(/<main[^>]*>([\s\S]*?)<\/main>/i);
+    
+    if (articleMatch) content = articleMatch[1];
+    else if (mainMatch) content = mainMatch[1];
+    
+    content = content
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .trim();
+    
+    if (content.length > 10000) content = content.slice(0, 10000) + "...";
+    
+    return { title, content, author };
+  } catch (error: any) {
+    return { title: null, content: null, error: error.message || "fetch_failed" };
+  }
+}
+
 // ===== TOOL DEFINITIONS (same as chat API) =====
 const tools = [
   {
@@ -205,6 +354,22 @@ const tools = [
           limit: { type: "number", description: "Number of notes to return (default 5)" },
         },
         required: [],
+      },
+    },
+  },
+  // ===== AUTO-SAVE FROM URL =====
+  {
+    type: "function" as const,
+    function: {
+      name: "save_from_url",
+      description: "Save content from a URL (YouTube video or article) as a note. Auto-fetches transcript/content, summarizes, and saves. Use when user shares a link and wants to save it.",
+      parameters: {
+        type: "object",
+        properties: {
+          url: { type: "string", description: "The URL to save" },
+          userComment: { type: "string", description: "Optional user's comment" },
+        },
+        required: ["url"],
       },
     },
   },
@@ -451,6 +616,108 @@ async function executeToolCall(
         });
       }
 
+      // ===== AUTO-SAVE FROM URL =====
+      case "save_from_url": {
+        const url = args.url;
+        const detected = detectUrls(url);
+        const urlInfo = detected[0] || { url, type: "article" as const };
+        
+        let title: string | null = null;
+        let content: string | null = null;
+        let author: string | undefined;
+        let source: "video" | "article" = "article";
+        let keyPoints: string[] = [];
+        let tags: string[] = [];
+        
+        if (urlInfo.type === "youtube") {
+          const result = await fetchVideoTranscript(url);
+          if (result.error || !result.text) {
+            return JSON.stringify({
+              error: `Could not fetch video: ${result.error || "No transcript"}`,
+            });
+          }
+          title = result.title || "YouTube Video";
+          author = result.author;
+          content = result.text;
+          source = "video";
+          
+          const summaryResponse = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+              {
+                role: "system",
+                content: `Summarize this video transcript. Return JSON: {"summary": "...", "keyPoints": ["...", ...], "tags": ["...", ...]}`
+              },
+              { role: "user", content: `${title}\n\n${content.slice(0, 6000)}` }
+            ],
+            temperature: 0.3,
+            response_format: { type: "json_object" },
+          });
+          
+          try {
+            const parsed = JSON.parse(summaryResponse.choices[0]?.message?.content || "{}");
+            content = `## Summary\n${parsed.summary}\n\n## Key Points\n${(parsed.keyPoints || []).map((p: string) => `• ${p}`).join('\n')}`;
+            keyPoints = parsed.keyPoints || [];
+            tags = parsed.tags || [];
+          } catch {
+            content = result.text.slice(0, 2000);
+          }
+        } else {
+          const result = await fetchArticleContent(url);
+          if (result.error || !result.content) {
+            return JSON.stringify({ error: `Could not fetch article: ${result.error}` });
+          }
+          title = result.title || new URL(url).hostname;
+          author = result.author;
+          content = result.content;
+          source = "article";
+          
+          const summaryResponse = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+              {
+                role: "system",
+                content: `Summarize this article. Return JSON: {"summary": "...", "keyPoints": ["...", ...], "tags": ["...", ...]}`
+              },
+              { role: "user", content: `${title}\n\n${content.slice(0, 6000)}` }
+            ],
+            temperature: 0.3,
+            response_format: { type: "json_object" },
+          });
+          
+          try {
+            const parsed = JSON.parse(summaryResponse.choices[0]?.message?.content || "{}");
+            content = `## Summary\n${parsed.summary}\n\n## Key Points\n${(parsed.keyPoints || []).map((p: string) => `• ${p}`).join('\n')}`;
+            keyPoints = parsed.keyPoints || [];
+            tags = parsed.tags || [];
+          } catch {
+            content = result.content.slice(0, 2000);
+          }
+        }
+        
+        if (args.userComment) {
+          content = `**My note:** ${args.userComment}\n\n${content}`;
+        }
+        
+        const noteId = await convex.mutation(api.notes.createNote, {
+          userId,
+          title: title || "Saved Link",
+          content,
+          tags: tags.length > 0 ? tags : undefined,
+          source,
+          sourceUrl: url,
+        });
+        
+        return JSON.stringify({
+          success: true,
+          noteId,
+          title,
+          keyPoints: keyPoints.slice(0, 4),
+          tags,
+          message: `📝 Saved: ${title}`,
+        });
+      }
+
       default:
         return JSON.stringify({ error: `Unknown tool: ${name}` });
     }
@@ -480,6 +747,10 @@ CAPABILITIES:
 - **Notes/Knowledge**: Save and search notes for the user
   - When user says "remember this" or "note that" → use save_note
   - When user asks "what did I save about..." → use search_notes
+- **Auto-Save Links**: When user shares a YouTube video or article URL:
+  - Use save_from_url to fetch content, summarize, and save as a note
+  - Share the key points after saving
+  - Works with YouTube, Medium, Substack, news sites, blogs
 - General chat and support
 
 FORMATTING FOR MESSAGING:

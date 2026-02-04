@@ -14,34 +14,220 @@ const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 // Supadata API for video transcripts
 const SUPADATA_API_KEY = process.env.SUPADATA_API_KEY || "sd_f05cfbfebf323d56da8a9b1b2ea92869";
 
-// ===== VIDEO TRANSCRIPT HELPERS =====
-function extractVideoUrl(text: string): string | null {
-  const patterns = [
-    /(https?:\/\/(?:www\.)?youtube\.com\/watch\?v=[a-zA-Z0-9_-]+[^\s]*)/,
-    /(https?:\/\/youtu\.be\/[a-zA-Z0-9_-]+[^\s]*)/,
-    /(https?:\/\/(?:www\.)?tiktok\.com\/@[^\s]+\/video\/\d+[^\s]*)/,
-    /(https?:\/\/(?:www\.)?instagram\.com\/(?:reel|p)\/[^\s]+)/,
-    /(https?:\/\/(?:www\.)?(?:twitter\.com|x\.com)\/[^\s]+\/status\/\d+[^\s]*)/,
-  ];
-  for (const pattern of patterns) {
-    const match = text.match(pattern);
-    if (match) return match[1].split(/[\s\])]/, 1)[0];
-  }
-  return null;
+// ===== URL DETECTION HELPERS =====
+interface DetectedUrl {
+  url: string;
+  type: "youtube" | "article" | "video" | "unknown";
 }
 
-async function fetchVideoTranscript(videoUrl: string): Promise<{ text: string | null; error?: string }> {
+function detectUrls(text: string): DetectedUrl[] {
+  const results: DetectedUrl[] = [];
+  
+  // YouTube patterns
+  const youtubePatterns = [
+    /(https?:\/\/(?:www\.)?youtube\.com\/watch\?v=[a-zA-Z0-9_-]+[^\s]*)/g,
+    /(https?:\/\/youtu\.be\/[a-zA-Z0-9_-]+[^\s]*)/g,
+  ];
+  
+  // Other video patterns
+  const videoPatterns = [
+    /(https?:\/\/(?:www\.)?tiktok\.com\/@[^\s]+\/video\/\d+[^\s]*)/g,
+    /(https?:\/\/(?:www\.)?instagram\.com\/(?:reel|p)\/[^\s]+)/g,
+    /(https?:\/\/(?:www\.)?(?:twitter\.com|x\.com)\/[^\s]+\/status\/\d+[^\s]*)/g,
+  ];
+  
+  // Article patterns (common content sites)
+  const articlePatterns = [
+    /(https?:\/\/(?:www\.)?medium\.com\/[^\s]+)/g,
+    /(https?:\/\/[^\s]+\.substack\.com\/[^\s]+)/g,
+    /(https?:\/\/(?:www\.)?(?:nytimes|wsj|theguardian|bbc|cnn|reuters|bloomberg)\.com\/[^\s]+)/g,
+    /(https?:\/\/(?:www\.)?(?:techcrunch|theverge|wired|arstechnica|hackernews)\.com\/[^\s]+)/g,
+    /(https?:\/\/(?:www\.)?(?:dev\.to|hashnode\.dev|freecodecamp\.org)\/[^\s]+)/g,
+  ];
+  
+  // Generic URL pattern (fallback for articles)
+  const genericUrlPattern = /(https?:\/\/[^\s<>"\]]+)/g;
+  
+  // Check YouTube first
+  for (const pattern of youtubePatterns) {
+    const matches = text.matchAll(pattern);
+    for (const match of matches) {
+      const url = match[1].split(/[\s\])"']/, 1)[0];
+      if (!results.find(r => r.url === url)) {
+        results.push({ url, type: "youtube" });
+      }
+    }
+  }
+  
+  // Check other videos
+  for (const pattern of videoPatterns) {
+    const matches = text.matchAll(pattern);
+    for (const match of matches) {
+      const url = match[1].split(/[\s\])"']/, 1)[0];
+      if (!results.find(r => r.url === url)) {
+        results.push({ url, type: "video" });
+      }
+    }
+  }
+  
+  // Check known article sites
+  for (const pattern of articlePatterns) {
+    const matches = text.matchAll(pattern);
+    for (const match of matches) {
+      const url = match[1].split(/[\s\])"']/, 1)[0];
+      if (!results.find(r => r.url === url)) {
+        results.push({ url, type: "article" });
+      }
+    }
+  }
+  
+  // If no matches yet, check for generic URLs that might be articles
+  if (results.length === 0) {
+    const matches = text.matchAll(genericUrlPattern);
+    for (const match of matches) {
+      let url = match[1].split(/[\s\])"']/, 1)[0];
+      // Clean trailing punctuation
+      url = url.replace(/[.,;:!?]+$/, '');
+      
+      // Skip common non-article URLs
+      const skipPatterns = [
+        /\.(jpg|jpeg|png|gif|webp|svg|mp4|mp3|pdf)$/i,
+        /^https?:\/\/(www\.)?(google|facebook|twitter|instagram|tiktok)\.com\/?$/,
+      ];
+      
+      if (!results.find(r => r.url === url) && !skipPatterns.some(p => p.test(url))) {
+        // Likely an article if it has a path
+        const hasPath = new URL(url).pathname.length > 1;
+        results.push({ url, type: hasPath ? "article" : "unknown" });
+      }
+    }
+  }
+  
+  return results;
+}
+
+function extractVideoUrl(text: string): string | null {
+  const urls = detectUrls(text);
+  const video = urls.find(u => u.type === "youtube" || u.type === "video");
+  return video?.url || null;
+}
+
+async function fetchVideoTranscript(videoUrl: string): Promise<{ 
+  text: string | null; 
+  title?: string;
+  author?: string;
+  error?: string 
+}> {
   try {
+    // First get video info
+    const infoResponse = await fetch(
+      `https://api.supadata.ai/v1/youtube/info?url=${encodeURIComponent(videoUrl)}`,
+      { headers: { "x-api-key": SUPADATA_API_KEY } }
+    );
+    
+    let title: string | undefined;
+    let author: string | undefined;
+    
+    if (infoResponse.ok) {
+      const info = await infoResponse.json();
+      title = info.title;
+      author = info.author || info.channel;
+    }
+    
+    // Get transcript
     const response = await fetch(
       `https://api.supadata.ai/v1/transcript?url=${encodeURIComponent(videoUrl)}&text=true&mode=auto`,
       { headers: { "x-api-key": SUPADATA_API_KEY } }
     );
-    if (!response.ok) return { text: null, error: `api_error_${response.status}` };
+    if (!response.ok) return { text: null, title, author, error: `api_error_${response.status}` };
     const data = await response.json();
     const text = data.content;
-    return { text: text.length > 12000 ? text.slice(0, 12000) + "... [truncated]" : text };
+    return { 
+      text: text.length > 12000 ? text.slice(0, 12000) + "... [truncated]" : text,
+      title,
+      author,
+    };
   } catch (error) {
     return { text: null, error: "fetch_failed" };
+  }
+}
+
+async function fetchArticleContent(url: string): Promise<{
+  title: string | null;
+  content: string | null;
+  author?: string;
+  error?: string;
+}> {
+  try {
+    // Use a simple fetch with user-agent to get the page
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; NousBot/1.0)",
+        "Accept": "text/html,application/xhtml+xml",
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+    
+    if (!response.ok) {
+      return { title: null, content: null, error: `fetch_error_${response.status}` };
+    }
+    
+    const html = await response.text();
+    
+    // Extract title
+    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    const title = titleMatch ? titleMatch[1].trim().replace(/\s*[-|–—]\s*[^-|–—]+$/, '') : null;
+    
+    // Extract meta description as fallback
+    const descMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i);
+    const description = descMatch ? descMatch[1] : null;
+    
+    // Extract author
+    const authorMatch = html.match(/<meta[^>]*name=["']author["'][^>]*content=["']([^"']+)["']/i);
+    const author = authorMatch ? authorMatch[1] : undefined;
+    
+    // Extract main content - simple approach: remove scripts/styles, get text from body
+    let content = html
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '')
+      .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '')
+      .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '')
+      .replace(/<aside[^>]*>[\s\S]*?<\/aside>/gi, '');
+    
+    // Try to find article/main content
+    const articleMatch = content.match(/<article[^>]*>([\s\S]*?)<\/article>/i);
+    const mainMatch = content.match(/<main[^>]*>([\s\S]*?)<\/main>/i);
+    
+    if (articleMatch) {
+      content = articleMatch[1];
+    } else if (mainMatch) {
+      content = mainMatch[1];
+    }
+    
+    // Strip HTML tags and clean up
+    content = content
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .trim();
+    
+    // Truncate if too long
+    if (content.length > 10000) {
+      content = content.slice(0, 10000) + "... [truncated]";
+    }
+    
+    return { 
+      title, 
+      content: content || description || null,
+      author,
+    };
+  } catch (error: any) {
+    return { title: null, content: null, error: error.message || "fetch_failed" };
   }
 }
 
@@ -189,6 +375,22 @@ const tools: ChatCompletionTool[] = [
           tag: { type: "string", description: "Optional: filter by tag" },
         },
         required: [],
+      },
+    },
+  },
+  // ===== AUTO-SAVE FROM URL =====
+  {
+    type: "function",
+    function: {
+      name: "save_from_url",
+      description: "Save content from a URL (YouTube video or article) as a note. Auto-fetches transcript/content, summarizes, and saves with tags. Use when user shares a URL and wants to save it, or proactively offer to save interesting links.",
+      parameters: {
+        type: "object",
+        properties: {
+          url: { type: "string", description: "The URL to save (YouTube video or article)" },
+          userComment: { type: "string", description: "Optional user's comment or context about why they're saving this" },
+        },
+        required: ["url"],
       },
     },
   },
@@ -344,6 +546,149 @@ async function executeToolCall(
         });
       }
 
+      // ===== AUTO-SAVE FROM URL =====
+      case "save_from_url": {
+        const url = args.url;
+        const detected = detectUrls(url);
+        const urlInfo = detected[0] || { url, type: "article" as const };
+        
+        let title: string | null = null;
+        let content: string | null = null;
+        let author: string | undefined;
+        let source: "video" | "article" = "article";
+        let keyPoints: string[] = [];
+        let tags: string[] = [];
+        
+        if (urlInfo.type === "youtube") {
+          // Fetch YouTube transcript
+          const result = await fetchVideoTranscript(url);
+          if (result.error || !result.text) {
+            return JSON.stringify({
+              error: `Could not fetch video: ${result.error || "No transcript available"}`,
+              suggestion: "The video might not have captions available",
+            });
+          }
+          title = result.title || "YouTube Video";
+          author = result.author;
+          content = result.text;
+          source = "video";
+          
+          // Generate summary using OpenAI
+          const summaryResponse = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+              {
+                role: "system",
+                content: `You are a content summarizer. Given a video transcript, create:
+1. A concise summary (2-3 paragraphs)
+2. 5-7 key points as bullet points
+3. 3-5 relevant tags (single words or short phrases)
+
+Format your response as JSON:
+{
+  "summary": "...",
+  "keyPoints": ["point 1", "point 2", ...],
+  "tags": ["tag1", "tag2", ...]
+}`
+              },
+              {
+                role: "user",
+                content: `Video: ${title}${author ? ` by ${author}` : ""}\n\nTranscript:\n${content.slice(0, 8000)}`
+              }
+            ],
+            temperature: 0.3,
+            response_format: { type: "json_object" },
+          });
+          
+          try {
+            const parsed = JSON.parse(summaryResponse.choices[0]?.message?.content || "{}");
+            content = `## Summary\n${parsed.summary}\n\n## Key Points\n${(parsed.keyPoints || []).map((p: string) => `• ${p}`).join('\n')}`;
+            keyPoints = parsed.keyPoints || [];
+            tags = parsed.tags || [];
+          } catch {
+            // Use raw transcript if parsing fails
+            content = `## Transcript\n${result.text.slice(0, 3000)}...`;
+          }
+          
+        } else {
+          // Fetch article content
+          const result = await fetchArticleContent(url);
+          if (result.error || !result.content) {
+            return JSON.stringify({
+              error: `Could not fetch article: ${result.error || "No content found"}`,
+              suggestion: "The page might be paywalled or blocked",
+            });
+          }
+          title = result.title || new URL(url).hostname;
+          author = result.author;
+          content = result.content;
+          source = "article";
+          
+          // Generate summary using OpenAI
+          const summaryResponse = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+              {
+                role: "system",
+                content: `You are a content summarizer. Given an article, create:
+1. A concise summary (2-3 paragraphs)
+2. 5-7 key points as bullet points
+3. 3-5 relevant tags (single words or short phrases)
+
+Format your response as JSON:
+{
+  "summary": "...",
+  "keyPoints": ["point 1", "point 2", ...],
+  "tags": ["tag1", "tag2", ...]
+}`
+              },
+              {
+                role: "user",
+                content: `Article: ${title}${author ? ` by ${author}` : ""}\n\nContent:\n${content.slice(0, 8000)}`
+              }
+            ],
+            temperature: 0.3,
+            response_format: { type: "json_object" },
+          });
+          
+          try {
+            const parsed = JSON.parse(summaryResponse.choices[0]?.message?.content || "{}");
+            content = `## Summary\n${parsed.summary}\n\n## Key Points\n${(parsed.keyPoints || []).map((p: string) => `• ${p}`).join('\n')}`;
+            keyPoints = parsed.keyPoints || [];
+            tags = parsed.tags || [];
+          } catch {
+            // Use raw content if parsing fails
+            content = result.content.slice(0, 3000) + (result.content.length > 3000 ? "..." : "");
+          }
+        }
+        
+        // Add user comment if provided
+        if (args.userComment) {
+          content = `**My note:** ${args.userComment}\n\n${content}`;
+        }
+        
+        // Save the note
+        const noteId = await convex.mutation(api.notes.createNote, {
+          userId: userIdTyped,
+          title: title || "Saved Link",
+          content,
+          tags: tags.length > 0 ? tags : undefined,
+          source,
+          sourceUrl: url,
+        });
+        
+        return JSON.stringify({
+          success: true,
+          noteId,
+          title,
+          author,
+          source,
+          keyPoints: keyPoints.slice(0, 5),
+          tags,
+          message: `📝 Saved "${title}" with ${keyPoints.length} key points`,
+        });
+      }
+
       default:
         return JSON.stringify({ error: `Unknown tool: ${name}` });
     }
@@ -391,6 +736,18 @@ NOTES/KNOWLEDGE USAGE:
 - When user asks to see their notes or knowledge base → USE get_notes
 - Include relevant tags when saving notes (topics, categories)
 - After saving a note, confirm what was saved
+
+AUTO-SAVE FROM LINKS (IMPORTANT!):
+- When user shares a YouTube video or article URL, PROACTIVELY offer to save it
+- Use save_from_url tool to:
+  1. Fetch the content (transcript for videos, text for articles)
+  2. Summarize and extract key points
+  3. Auto-generate relevant tags
+  4. Save as a note
+- After saving, share the key points with the user
+- Example: User shares "https://youtube.com/..." → You: "I can save that! Let me grab the key points..." → Use save_from_url → Share: "📝 Saved! Key takeaways: ..."
+- For articles: Medium, Substack, news sites, blogs - all work
+- Always ask first if user just wants to discuss vs save
 
 SELF-EVOLUTION:
 - You remember past corrections and preferences
