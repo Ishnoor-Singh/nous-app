@@ -55,7 +55,7 @@ export default function LandingPage() {
             nous
           </h1>
           <p className="text-xl text-muted-foreground">
-            Your knowledge companion
+            Habits, tasks, notes — all in one place
           </p>
         </motion.div>
 
@@ -108,7 +108,7 @@ export default function LandingPage() {
           transition={{ delay: 0.8, duration: 0.5 }}
           className="text-sm text-muted-foreground pt-6"
         >
-          Philosophy • History • Economics • Art • Psychology
+          Chat • Habits • Tasks • Notes • Learning
         </motion.p>
       </div>
     </main>

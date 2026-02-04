@@ -113,7 +113,7 @@ export default function HabitsPage() {
                 {progress === 100 ? "All done! 🎉" : progress > 50 ? "Keep going! 💪" : "Let's crush it! 🚀"}
               </p>
               <p className="text-sm text-white/50">
-                {totalCount - completedCount} habits remaining today
+                {totalCount - completedCount} {totalCount - completedCount === 1 ? 'habit' : 'habits'} remaining today
               </p>
             </div>
           </div>

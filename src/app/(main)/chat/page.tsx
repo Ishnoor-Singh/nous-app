@@ -9,6 +9,7 @@ import { Send, Loader2, Plus, MessageSquare, ChevronLeft, Menu, X, Image as Imag
 import { Id } from "../../../../convex/_generated/dataModel";
 import { CreatureCharacter, CREATURES, type CreatureId, type MoodType } from "@/components/creature/CreatureCharacter";
 import ImageUpload, { ImagePreviewBadge } from "@/components/ImageUpload";
+import SimpleMarkdown from "@/components/SimpleMarkdown";
 
 export default function ChatPage() {
   const { user } = useUser();
@@ -425,9 +426,9 @@ export default function ChatPage() {
                     ))}
                   </div>
                 )}
-                <p className="whitespace-pre-wrap leading-relaxed text-white">
-                  {message.content}
-                </p>
+                <div className="whitespace-pre-wrap text-white">
+                  <SimpleMarkdown content={message.content} />
+                </div>
               </div>
             </motion.div>
           ))}
