@@ -28,7 +28,7 @@ import {
   Link as LinkIcon,
   Highlighter,
 } from "lucide-react";
-import SlashMenu from "./SlashMenu";
+import SlashMenu, { slashCommands } from "./SlashMenu";
 
 const lowlight = createLowlight(common);
 
@@ -53,6 +53,9 @@ export default function BlockEditor({
 }: BlockEditorProps) {
   const [showSlashMenu, setShowSlashMenu] = useState(false);
   const [slashMenuPosition, setSlashMenuPosition] = useState({ top: 0, left: 0 });
+  const [slashStartPos, setSlashStartPos] = useState<number | null>(null);
+  const [slashFilter, setSlashFilter] = useState("");
+  const [slashMenuIndex, setSlashMenuIndex] = useState(0);
 
   const editor = useEditor({
     extensions: [
@@ -90,30 +93,89 @@ export default function BlockEditor({
       const text = editor.getText();
       const wikiLinks = extractWikiLinks(text);
       onChange?.(json, text, wikiLinks);
+      
+      // Update slash filter if menu is open
+      if (showSlashMenu && slashStartPos !== null) {
+        const currentPos = editor.state.selection.from;
+        const filterText = editor.state.doc.textBetween(slashStartPos, currentPos);
+        setSlashFilter(filterText);
+      }
     },
     editorProps: {
       attributes: {
         class: `prose prose-invert prose-sm sm:prose-base max-w-none focus:outline-none min-h-[200px] ${className}`,
       },
       handleKeyDown: (view, event) => {
-        // Handle slash command
+        // Handle slash command - only at start of line or after whitespace
         if (event.key === "/" && !showSlashMenu) {
           const { state } = view;
           const { from } = state.selection;
-          const coords = view.coordsAtPos(from);
           
-          setSlashMenuPosition({
-            top: coords.bottom + 8,
-            left: coords.left,
-          });
-          setShowSlashMenu(true);
+          // Check if slash is at start of line or after whitespace
+          const textBefore = state.doc.textBetween(Math.max(0, from - 1), from);
+          const isValidPosition = from === 0 || textBefore === "" || /\s/.test(textBefore);
+          
+          if (isValidPosition) {
+            const coords = view.coordsAtPos(from);
+            setSlashMenuPosition({
+              top: coords.bottom + 8,
+              left: coords.left,
+            });
+            // Store position AFTER the slash will be typed (from + 1)
+            setSlashStartPos(from + 1);
+            setShowSlashMenu(true);
+          }
           return false;
         }
         
-        // Close slash menu on escape
-        if (event.key === "Escape" && showSlashMenu) {
-          setShowSlashMenu(false);
-          return true;
+        // Handle slash menu navigation
+        if (showSlashMenu) {
+          // Get filtered commands to know max index
+          const currentFilter = slashStartPos !== null 
+            ? view.state.doc.textBetween(slashStartPos, view.state.selection.from)
+            : "";
+          const filtered = slashCommands.filter(
+            (cmd) =>
+              cmd.label.toLowerCase().includes(currentFilter.toLowerCase()) ||
+              cmd.description.toLowerCase().includes(currentFilter.toLowerCase())
+          );
+          
+          if (event.key === "Escape") {
+            setShowSlashMenu(false);
+            setSlashStartPos(null);
+            setSlashFilter("");
+            setSlashMenuIndex(0);
+            return true;
+          }
+          if (event.key === "ArrowDown") {
+            event.preventDefault();
+            setSlashMenuIndex(i => Math.min(i + 1, filtered.length - 1));
+            return true;
+          }
+          if (event.key === "ArrowUp") {
+            event.preventDefault();
+            setSlashMenuIndex(i => Math.max(0, i - 1));
+            return true;
+          }
+          if (event.key === "Enter" && filtered.length > 0) {
+            event.preventDefault();
+            const selectedCmd = filtered[Math.min(slashMenuIndex, filtered.length - 1)];
+            if (selectedCmd) {
+              // Use setTimeout to avoid state conflicts
+              setTimeout(() => handleSlashCommand(selectedCmd.id), 0);
+            }
+            return true;
+          }
+          // Backspace past the slash should close menu
+          if (event.key === "Backspace" && slashStartPos !== null) {
+            const { from } = view.state.selection;
+            if (from <= slashStartPos) {
+              setShowSlashMenu(false);
+              setSlashStartPos(null);
+              setSlashFilter("");
+              setSlashMenuIndex(0);
+            }
+          }
         }
         
         // Save shortcut
@@ -137,7 +199,12 @@ export default function BlockEditor({
 
   // Close slash menu when clicking elsewhere
   useEffect(() => {
-    const handleClick = () => setShowSlashMenu(false);
+    const handleClick = () => {
+      setShowSlashMenu(false);
+      setSlashStartPos(null);
+      setSlashFilter("");
+      setSlashMenuIndex(0);
+    };
     document.addEventListener("click", handleClick);
     return () => document.removeEventListener("click", handleClick);
   }, []);
@@ -146,11 +213,14 @@ export default function BlockEditor({
     (command: string) => {
       if (!editor) return;
       
-      // Delete the slash character
-      editor.commands.deleteRange({
-        from: editor.state.selection.from - 1,
-        to: editor.state.selection.from,
-      });
+      // Delete everything from the slash to current position (slash + any filter text)
+      const currentPos = editor.state.selection.from;
+      if (slashStartPos !== null) {
+        editor.commands.deleteRange({
+          from: slashStartPos - 1, // -1 to include the slash itself
+          to: currentPos,
+        });
+      }
 
       switch (command) {
         case "h1":
@@ -183,8 +253,11 @@ export default function BlockEditor({
       }
       
       setShowSlashMenu(false);
+      setSlashStartPos(null);
+      setSlashFilter("");
+      setSlashMenuIndex(0);
     },
-    [editor]
+    [editor, slashStartPos]
   );
 
   if (!editor) {
@@ -254,7 +327,15 @@ export default function BlockEditor({
         <SlashMenu
           position={slashMenuPosition}
           onSelect={handleSlashCommand}
-          onClose={() => setShowSlashMenu(false)}
+          onClose={() => {
+            setShowSlashMenu(false);
+            setSlashStartPos(null);
+            setSlashFilter("");
+            setSlashMenuIndex(0);
+          }}
+          filter={slashFilter}
+          selectedIndex={slashMenuIndex}
+          onIndexChange={setSlashMenuIndex}
         />
       )}
 

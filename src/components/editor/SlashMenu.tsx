@@ -19,9 +19,12 @@ interface SlashMenuProps {
   position: { top: number; left: number };
   onSelect: (command: string) => void;
   onClose: () => void;
+  filter?: string;
+  selectedIndex?: number;
+  onIndexChange?: (index: number) => void;
 }
 
-const commands = [
+export const slashCommands = [
   { id: "h1", label: "Heading 1", description: "Large heading", icon: Heading1 },
   { id: "h2", label: "Heading 2", description: "Medium heading", icon: Heading2 },
   { id: "h3", label: "Heading 3", description: "Small heading", icon: Heading3 },
@@ -33,53 +36,38 @@ const commands = [
   { id: "divider", label: "Divider", description: "Visual divider", icon: Minus },
 ];
 
-export default function SlashMenu({ position, onSelect, onClose }: SlashMenuProps) {
-  const [filter, setFilter] = useState("");
-  const [selectedIndex, setSelectedIndex] = useState(0);
+export default function SlashMenu({ 
+  position, 
+  onSelect, 
+  onClose, 
+  filter = "",
+  selectedIndex: externalIndex,
+  onIndexChange,
+}: SlashMenuProps) {
+  const [internalIndex, setInternalIndex] = useState(0);
+  const selectedIndex = externalIndex ?? internalIndex;
   const menuRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
-  const filteredCommands = commands.filter(
+  const filteredCommands = slashCommands.filter(
     (cmd) =>
       cmd.label.toLowerCase().includes(filter.toLowerCase()) ||
       cmd.description.toLowerCase().includes(filter.toLowerCase())
   );
 
+  // Reset index when filter changes
   useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
+    if (onIndexChange) {
+      onIndexChange(0);
+    } else {
+      setInternalIndex(0);
+    }
+  }, [filter, onIndexChange]);
+  
+  // Clamp index to valid range
+  const clampedIndex = Math.min(selectedIndex, Math.max(0, filteredCommands.length - 1));
 
-  useEffect(() => {
-    setSelectedIndex(0);
-  }, [filter]);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      switch (e.key) {
-        case "ArrowDown":
-          e.preventDefault();
-          setSelectedIndex((i) => Math.min(i + 1, filteredCommands.length - 1));
-          break;
-        case "ArrowUp":
-          e.preventDefault();
-          setSelectedIndex((i) => Math.max(i - 1, 0));
-          break;
-        case "Enter":
-          e.preventDefault();
-          if (filteredCommands[selectedIndex]) {
-            onSelect(filteredCommands[selectedIndex].id);
-          }
-          break;
-        case "Escape":
-          e.preventDefault();
-          onClose();
-          break;
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [filteredCommands, selectedIndex, onSelect, onClose]);
+  // Keyboard handling is now done by the parent editor
+  // This allows typing to continue in the editor while slash menu is open
 
   // Adjust position to stay within viewport
   const adjustedPosition = { ...position };
@@ -110,17 +98,12 @@ export default function SlashMenu({ position, onSelect, onClose }: SlashMenuProp
       className="w-72 glass-card border border-white/10 rounded-xl overflow-hidden shadow-2xl"
       onClick={(e) => e.stopPropagation()}
     >
-      {/* Search Input */}
-      <div className="p-2 border-b border-white/10">
-        <input
-          ref={inputRef}
-          type="text"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          placeholder="Type to filter..."
-          className="w-full px-3 py-2 bg-white/5 rounded-lg text-white text-sm placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-accent/50"
-        />
-      </div>
+      {/* Filter indicator */}
+      {filter && (
+        <div className="px-3 py-2 border-b border-white/10 text-sm text-white/50">
+          Filtering: <span className="text-white">{filter}</span>
+        </div>
+      )}
 
       {/* Commands List */}
       <div className="max-h-64 overflow-y-auto p-1">
@@ -134,14 +117,14 @@ export default function SlashMenu({ position, onSelect, onClose }: SlashMenuProp
               key={cmd.id}
               onClick={() => onSelect(cmd.id)}
               className={`w-full flex items-center gap-3 p-2 rounded-lg transition-all text-left ${
-                index === selectedIndex
+                index === clampedIndex
                   ? "bg-accent/20 text-white"
                   : "text-white/70 hover:bg-white/5 hover:text-white"
               }`}
             >
               <div
                 className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                  index === selectedIndex ? "bg-accent/30" : "bg-white/10"
+                  index === clampedIndex ? "bg-accent/30" : "bg-white/10"
                 }`}
               >
                 <cmd.icon className="w-4 h-4" />
