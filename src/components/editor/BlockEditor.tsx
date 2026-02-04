@@ -10,7 +10,8 @@ import Highlight from "@tiptap/extension-highlight";
 import Link from "@tiptap/extension-link";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import { common, createLowlight } from "lowlight";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
+import { WikiLink, extractWikiLinks } from "./WikiLinkExtension";
 import {
   Bold,
   Italic,
@@ -34,8 +35,9 @@ const lowlight = createLowlight(common);
 interface BlockEditorProps {
   content?: any;
   placeholder?: string;
-  onChange?: (json: any, text: string) => void;
+  onChange?: (json: any, text: string, wikiLinks: string[]) => void;
   onSave?: () => void;
+  onWikiLinkClick?: (noteTitle: string) => void;
   editable?: boolean;
   className?: string;
 }
@@ -45,6 +47,7 @@ export default function BlockEditor({
   placeholder = "Start writing, or press '/' for commands...",
   onChange,
   onSave,
+  onWikiLinkClick,
   editable = true,
   className = "",
 }: BlockEditorProps) {
@@ -76,13 +79,17 @@ export default function BlockEditor({
       CodeBlockLowlight.configure({
         lowlight,
       }),
+      WikiLink.configure({
+        onLinkClick: onWikiLinkClick,
+      }),
     ],
     content: content || "",
     editable,
     onUpdate: ({ editor }) => {
       const json = editor.getJSON();
       const text = editor.getText();
-      onChange?.(json, text);
+      const wikiLinks = extractWikiLinks(text);
+      onChange?.(json, text, wikiLinks);
     },
     editorProps: {
       attributes: {
@@ -399,6 +406,20 @@ export default function BlockEditor({
 
         .ProseMirror a {
           color: var(--accent, #6366f1);
+          text-decoration: underline;
+        }
+
+        .ProseMirror .wiki-link {
+          color: var(--accent, #6366f1);
+          background: rgba(99, 102, 241, 0.1);
+          padding: 0.125rem 0.375rem;
+          border-radius: 0.25rem;
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+
+        .ProseMirror .wiki-link:hover {
+          background: rgba(99, 102, 241, 0.2);
           text-decoration: underline;
         }
 

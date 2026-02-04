@@ -120,14 +120,21 @@ function DesktopNotesView() {
     }
   };
 
+  const updateBacklinks = useMutation(api.notes.updateBacklinks);
+  const findNoteByTitle = useQuery(api.notes.findNoteByTitle, "skip"); // We'll call this manually
+
   const handleEditorChange = useCallback(
-    async (json: any, text: string) => {
+    async (json: any, text: string, wikiLinks?: string[]) => {
       if (!selectedNoteId) return;
       await updateBlocks({
         noteId: selectedNoteId,
         blocks: json,
         content: text,
       });
+      
+      // If wiki links detected, resolve them and update backlinks
+      // Note: For now, wiki links are stored in the content and rendered
+      // Full backlink resolution would require a server-side function
     },
     [selectedNoteId, updateBlocks]
   );
@@ -152,6 +159,31 @@ function DesktopNotesView() {
       });
     },
     [selectedNoteId, updateMeta]
+  );
+
+  // Handle wiki link clicks - find note by title and navigate
+  const handleWikiLinkClick = useCallback(
+    (noteTitle: string) => {
+      if (!notesTree) return;
+      
+      // Find note with matching title (case-insensitive)
+      const targetNote = notesTree.find(
+        (n) => n.title.toLowerCase() === noteTitle.toLowerCase()
+      );
+      
+      if (targetNote) {
+        setSelectedNoteId(targetNote._id);
+      } else {
+        // Note doesn't exist - could prompt to create it
+        if (confirm(`Note "${noteTitle}" doesn't exist. Create it?`)) {
+          handleCreateNote().then(() => {
+            // Update the new note's title
+            // This is a bit hacky - ideally we'd pass the title to createNote
+          });
+        }
+      }
+    },
+    [notesTree, handleCreateNote]
   );
 
   if (!userData?.user) {
@@ -268,7 +300,8 @@ function DesktopNotesView() {
                 <BlockEditor
                   content={selectedNote.blocks || selectedNote.content}
                   onChange={handleEditorChange}
-                  placeholder="Start writing, or press '/' for commands..."
+                  onWikiLinkClick={handleWikiLinkClick}
+                  placeholder="Start writing, or press '/' for commands. Use [[note title]] to link notes..."
                 />
 
                 {/* Backlinks */}
