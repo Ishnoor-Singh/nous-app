@@ -83,6 +83,28 @@ export const getUser = query({
   },
 });
 
+// Get user by email (for bot API identification)
+export const getUserByEmail = query({
+  args: { email: v.string() },
+  handler: async (ctx, args) => {
+    // Note: This scans all users - for production, add an index on email
+    const users = await ctx.db.query("users").collect();
+    return users.find(u => u.email.toLowerCase() === args.email.toLowerCase()) || null;
+  },
+});
+
+// Get user by phone number (for WhatsApp/SMS bot)
+export const getUserByPhone = query({
+  args: { phone: v.string() },
+  handler: async (ctx, args) => {
+    // Normalize phone (remove spaces, dashes)
+    const normalizedPhone = args.phone.replace(/[\s-]/g, "");
+    // For now, we'd need to add phone to the user schema
+    // This is a placeholder for future implementation
+    return null;
+  },
+});
+
 // Save onboarding preferences
 export const completeOnboarding = mutation({
   args: {
