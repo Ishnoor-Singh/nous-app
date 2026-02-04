@@ -61,10 +61,18 @@ export default function ChatPage() {
     scrollToBottom();
   }, [conversationData?.messages]);
 
-  // Auto-load most recent conversation
+  // Auto-load most recent conversation if it was active today
   useEffect(() => {
     if (recentConversations && recentConversations.length > 0 && !activeConversationId) {
-      // Don't auto-load, let user start fresh or pick one
+      const mostRecent = recentConversations[0];
+      const lastMessageDate = new Date(mostRecent.lastMessageAt);
+      const now = new Date();
+      const hoursSinceLastMessage = (now.getTime() - lastMessageDate.getTime()) / (1000 * 60 * 60);
+      
+      // Auto-open if last message was within 4 hours
+      if (hoursSinceLastMessage < 4) {
+        setActiveConversationId(mostRecent._id);
+      }
     }
   }, [recentConversations, activeConversationId]);
 
@@ -167,10 +175,26 @@ export default function ChatPage() {
         } : undefined,
       });
 
-      // Auto-generate title from first exchange
+      // Auto-generate smart title from first exchange
       if (!conversationData?.conversation?.title && conversationData?.messages?.length === 0) {
-        const title = messageText.slice(0, 50) + (messageText.length > 50 ? "..." : "");
-        await updateTitle({ conversationId: convId, title });
+        // Generate a smart title based on the conversation
+        try {
+          const titleResponse = await fetch("/api/generate-title", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ 
+              userMessage: messageText, 
+              assistantResponse: data.response 
+            }),
+          });
+          const titleData = await titleResponse.json();
+          const title = titleData.title || messageText.slice(0, 40) + (messageText.length > 40 ? "..." : "");
+          await updateTitle({ conversationId: convId, title });
+        } catch {
+          // Fallback to simple truncation
+          const title = messageText.slice(0, 40) + (messageText.length > 40 ? "..." : "");
+          await updateTitle({ conversationId: convId, title });
+        }
       }
 
       setTimeout(() => {

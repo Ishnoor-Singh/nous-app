@@ -3,14 +3,19 @@
 import { useUser, SignOutButton } from "@clerk/nextjs";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import { useMutation, useQuery } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
 import { 
   Sun, Moon, Bell, BellOff, Volume2, VolumeX,
   Globe, Palette, Shield, Trash2, LogOut,
-  ChevronRight, Check
+  ChevronRight, Check, RotateCcw, Loader2
 } from "lucide-react";
 
 export default function SettingsPage() {
   const { user } = useUser();
+  const userData = useQuery(api.users.getUser, { clerkId: user?.id || "" });
+  const resetAccount = useMutation(api.users.resetAccount);
+  const [isResetting, setIsResetting] = useState(false);
   const [settings, setSettings] = useState({
     theme: "system" as "light" | "dark" | "system",
     notifications: true,
@@ -18,6 +23,29 @@ export default function SettingsPage() {
     voiceMode: false,
     language: "en",
   });
+
+  const handleResetAccount = async () => {
+    if (!userData?._id) return;
+    
+    const confirmed = confirm(
+      "⚠️ Reset Account?\n\nThis will delete ALL your data:\n• Conversations\n• Habits & logs\n• Tasks & projects\n• Notes & journal entries\n• AI learnings\n\nThis cannot be undone!"
+    );
+    
+    if (confirmed) {
+      setIsResetting(true);
+      try {
+        await resetAccount({ userId: userData._id });
+        localStorage.clear();
+        alert("Account reset complete! Refreshing...");
+        window.location.href = "/home";
+      } catch (error) {
+        console.error("Reset failed:", error);
+        alert("Failed to reset account. Please try again.");
+      } finally {
+        setIsResetting(false);
+      }
+    }
+  };
 
   // Load settings from localStorage
   useEffect(() => {
@@ -142,15 +170,21 @@ export default function SettingsPage() {
         </SettingRow>
 
         <SettingRow
+          icon={isResetting ? <Loader2 className="w-5 h-5 text-orange-500 animate-spin" /> : <RotateCcw className="w-5 h-5 text-orange-500" />}
+          label="Reset Account"
+          description="Clear all data and start fresh"
+          onClick={handleResetAccount}
+          danger
+        >
+          <ChevronRight className="w-5 h-5 text-muted-foreground" />
+        </SettingRow>
+
+        <SettingRow
           icon={<Trash2 className="w-5 h-5 text-red-500" />}
-          label="Delete All Data"
-          description="This cannot be undone"
+          label="Delete Account"
+          description="Permanently delete your account"
           onClick={() => {
-            if (confirm("Are you sure? This will delete all your conversations and progress.")) {
-              // Delete user data
-              localStorage.clear();
-              window.location.reload();
-            }
+            alert("To delete your account, please contact support.");
           }}
           danger
         >

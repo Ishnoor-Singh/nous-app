@@ -173,3 +173,141 @@ export const getUserWithState = query({
     return { user, emotionalState, learningProgress };
   },
 });
+
+// Reset all user data (conversations, habits, todos, notes, etc.)
+export const resetAccount = mutation({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    const userId = args.userId;
+    
+    // Delete all conversations and messages
+    const conversations = await ctx.db
+      .query("conversations")
+      .withIndex("by_user_recent", (q) => q.eq("userId", userId))
+      .collect();
+    
+    for (const conv of conversations) {
+      // Delete messages in conversation
+      const messages = await ctx.db
+        .query("messages")
+        .withIndex("by_conversation", (q) => q.eq("conversationId", conv._id))
+        .collect();
+      for (const msg of messages) {
+        await ctx.db.delete(msg._id);
+      }
+      await ctx.db.delete(conv._id);
+    }
+
+    // Delete habits and habit logs
+    const habits = await ctx.db
+      .query("habits")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    for (const habit of habits) {
+      const logs = await ctx.db
+        .query("habitLogs")
+        .withIndex("by_habit", (q) => q.eq("habitId", habit._id))
+        .collect();
+      for (const log of logs) {
+        await ctx.db.delete(log._id);
+      }
+      await ctx.db.delete(habit._id);
+    }
+
+    // Delete todos
+    const todos = await ctx.db
+      .query("todos")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    for (const todo of todos) {
+      await ctx.db.delete(todo._id);
+    }
+
+    // Delete projects
+    const projects = await ctx.db
+      .query("projects")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    for (const project of projects) {
+      await ctx.db.delete(project._id);
+    }
+
+    // Delete notes
+    const notes = await ctx.db
+      .query("notes")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    for (const note of notes) {
+      await ctx.db.delete(note._id);
+    }
+
+    // Delete journal entries
+    const journals = await ctx.db
+      .query("journalEntries")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    for (const journal of journals) {
+      await ctx.db.delete(journal._id);
+    }
+
+    // Delete AI learnings
+    const learnings = await ctx.db
+      .query("aiLearnings")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    for (const learning of learnings) {
+      await ctx.db.delete(learning._id);
+    }
+
+    // Delete quick captures
+    const captures = await ctx.db
+      .query("quickCapture")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    for (const capture of captures) {
+      await ctx.db.delete(capture._id);
+    }
+
+    // Delete media items
+    const media = await ctx.db
+      .query("media")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    for (const item of media) {
+      await ctx.db.delete(item._id);
+    }
+
+    // Reset emotional state
+    const emotionalState = await ctx.db
+      .query("emotionalState")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .first();
+    if (emotionalState) {
+      await ctx.db.patch(emotionalState._id, {
+        valence: 0.2,
+        arousal: 0.3,
+        connection: 0.1,
+        curiosity: 0.6,
+        energy: 0.5,
+        recentEmotions: [],
+        lastUpdated: Date.now(),
+      });
+    }
+
+    // Reset learning progress
+    const learningProgress = await ctx.db
+      .query("learningProgress")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .first();
+    if (learningProgress) {
+      await ctx.db.patch(learningProgress._id, {
+        currentStreak: 0,
+        totalCardsCompleted: 0,
+        struggles: [],
+        mastered: [],
+      });
+    }
+
+    return { success: true };
+  },
+});
