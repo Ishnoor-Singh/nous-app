@@ -344,9 +344,10 @@ function DesktopNotesView() {
           >
             <AIAssistant
               noteTitle={selectedNote?.title || ""}
-              noteContent={selectedNote?.content || ""}
+              noteContent={typeof selectedNote?.content === 'string' ? selectedNote.content : JSON.stringify(selectedNote?.content || "")}
               isCollapsed={false}
               onToggle={() => setAiPanelOpen(false)}
+              userId={userData?.user?._id}
             />
           </motion.div>
         )}

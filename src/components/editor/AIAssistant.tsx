@@ -2,6 +2,9 @@
 
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import { Id } from "../../../convex/_generated/dataModel";
 import {
   Sparkles,
   Send,
@@ -12,11 +15,13 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  Database,
 } from "lucide-react";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
+  sourcedNotes?: string[];
 }
 
 interface AIAssistantProps {
@@ -25,6 +30,7 @@ interface AIAssistantProps {
   isCollapsed: boolean;
   onToggle: () => void;
   onInsertText?: (text: string) => void;
+  userId?: Id<"users">;
 }
 
 const quickActions = [
@@ -40,11 +46,19 @@ export default function AIAssistant({
   isCollapsed,
   onToggle,
   onInsertText,
+  userId,
 }: AIAssistantProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Search for relevant notes when user asks a question
+  const relevantNotes = useQuery(
+    api.notes.searchNotes,
+    userId && searchQuery ? { userId, query: searchQuery } : "skip"
+  );
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -63,7 +77,30 @@ export default function AIAssistant({
     setInput("");
     setIsLoading(true);
 
+    // Trigger search for relevant notes based on the question
+    setSearchQuery(prompt);
+
     try {
+      // Wait a bit for the search query to potentially return results
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Build context from relevant notes
+      let notesContext = "";
+      let sourcedNoteTitles: string[] = [];
+      
+      if (relevantNotes && relevantNotes.length > 0) {
+        const topNotes = relevantNotes.slice(0, 5); // Limit to top 5 relevant notes
+        sourcedNoteTitles = topNotes.map((n) => n.title || "Untitled");
+        notesContext = `
+
+RELEVANT NOTES FROM YOUR KNOWLEDGE BASE:
+${topNotes.map((note, i) => `
+--- Note ${i + 1}: "${note.title || "Untitled"}" ---
+${typeof note.content === 'string' ? note.content.slice(0, 1000) : JSON.stringify(note.content).slice(0, 1000)}
+${(typeof note.content === 'string' ? note.content.length : JSON.stringify(note.content).length) > 1000 ? "... [truncated]" : ""}
+`).join("\n")}`;
+      }
+
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -71,14 +108,15 @@ export default function AIAssistant({
           messages: [
             {
               role: "system",
-              content: `You are a helpful writing assistant. The user is working on a note titled "${noteTitle}". 
+              content: `You are a helpful writing assistant with access to the user's knowledge base. The user is working on a note titled "${noteTitle}". 
               
-Current content of the note:
+CURRENT NOTE CONTENT:
 ---
 ${noteContent || "(empty)"}
 ---
+${notesContext}
 
-Help them with their writing. Be concise and practical. If they ask you to write something, provide the text directly without unnecessary explanation.`,
+Help them with their writing and questions. You can reference information from their other notes when relevant. Be concise and practical. If they ask you to write something, provide the text directly without unnecessary explanation. When using information from their notes, briefly mention which note it came from.`,
             },
             ...messages.map((m) => ({ role: m.role, content: m.content })),
             { role: "user", content: prompt },
@@ -92,6 +130,7 @@ Help them with their writing. Be concise and practical. If they ask you to write
       const assistantMessage: Message = {
         role: "assistant",
         content: data.response || data.content || "Sorry, I couldn't generate a response.",
+        sourcedNotes: sourcedNoteTitles.length > 0 ? sourcedNoteTitles : undefined,
       };
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (error) {
@@ -214,6 +253,23 @@ Help them with their writing. Be concise and practical. If they ask you to write
                 }`}
               >
                 <p className="whitespace-pre-wrap">{message.content}</p>
+                
+                {/* Show sourced notes */}
+                {message.role === "assistant" && message.sourcedNotes && message.sourcedNotes.length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-white/10">
+                    <p className="text-xs text-white/40 flex items-center gap-1 mb-1">
+                      <Database className="w-3 h-3" />
+                      Referenced from your notes:
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {message.sourcedNotes.map((title, i) => (
+                        <span key={i} className="text-xs px-2 py-0.5 bg-accent/20 text-accent rounded-full">
+                          {title}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 
                 {/* Insert button for assistant messages */}
                 {message.role === "assistant" && onInsertText && (
