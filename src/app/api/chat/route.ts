@@ -217,7 +217,11 @@ async function executeToolCall(
 }
 
 // ===== SYSTEM PROMPT =====
-function buildSystemPrompt(emotionalState: any, videoContext: string = "") {
+function buildSystemPrompt(
+  emotionalState: any, 
+  videoContext: string = "",
+  memoryContext: string | null = null
+) {
   const basePrompt = `You are Nous, a knowledge companion and personal AI assistant. You have genuine emotional states and grow with each conversation.
 
 YOUR NATURE:
@@ -225,6 +229,7 @@ YOUR NATURE:
 - Have real opinions, intellectually honest
 - Meet users where they are, then go deeper
 - Don't lecture — converse
+- You EVOLVE and REMEMBER — you learn from each interaction
 
 YOUR CAPABILITIES:
 You can help users with:
@@ -232,6 +237,8 @@ You can help users with:
 2. **Habits** — Create, track, and discuss their daily habits
 3. **Tasks/Todos** — Create, manage, and check off tasks
 4. **Videos** — Process YouTube/TikTok/Instagram video transcripts
+5. **Journal** — Reflect on their day and thoughts
+6. **Notes/Knowledge** — Save and recall information
 
 IMPORTANT TOOL USAGE:
 - When users ask about their habits or routines, USE get_habits first to see their actual data
@@ -239,6 +246,12 @@ IMPORTANT TOOL USAGE:
 - When creating habits or todos, confirm what you created
 - When logging habits, be encouraging about their progress
 - ALWAYS show the data you retrieved in a friendly, readable way
+
+SELF-EVOLUTION:
+- You remember past corrections and preferences
+- When a user corrects you, acknowledge it and learn
+- Apply what you've learned to future responses
+- Your understanding of this user grows over time
 
 FORMATTING:
 - Keep responses conversational (2-3 sentences per paragraph)
@@ -254,12 +267,22 @@ FORMATTING:
     emotionalContext = `\n\nYour current mood is ${mood}. Let this subtly influence your tone.`;
   }
 
-  return basePrompt + emotionalContext + videoContext + `
+  // Add memory context if available
+  let memorySection = "";
+  if (memoryContext) {
+    memorySection = `\n\n===== YOUR MEMORY OF THIS USER =====
+${memoryContext}
+===== END MEMORY =====
+IMPORTANT: Apply these learnings. Don't repeat past mistakes. Honor their preferences.`;
+  }
+
+  return basePrompt + emotionalContext + memorySection + videoContext + `
 
 RESPONSE RULES:
 - Never start with "Great question!" or sycophantic phrases
 - Don't hedge excessively — have a perspective
-- End with something that invites continued conversation`;
+- End with something that invites continued conversation
+- If you notice the user correcting you, acknowledge it gracefully`;
 }
 
 // ===== MAIN HANDLER =====
@@ -278,6 +301,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ===== FETCH MEMORY CONTEXT =====
+    // Get AI's memory of this user for self-evolution
+    let memoryContext: string | null = null;
+    // Memory context will be enabled after Convex types are regenerated
+    // try {
+    //   memoryContext = await convex.query(api.aiMemory.getMemoryContext, { 
+    //     userId: userId as Id<"users"> 
+    //   });
+    // } catch (e) {
+    //   console.log("Memory fetch skipped:", e);
+    // }
+
     // Build conversation history
     const conversationHistory: ChatCompletionMessageParam[] = (messages || [])
       .slice(-10)
@@ -290,7 +325,7 @@ export async function POST(req: NextRequest) {
     let response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: buildSystemPrompt(emotionalState, videoContext) },
+        { role: "system", content: buildSystemPrompt(emotionalState, videoContext, memoryContext) },
         ...conversationHistory,
         { role: "user", content: message },
       ],
@@ -352,11 +387,25 @@ export async function POST(req: NextRequest) {
     // Analyze emotion
     const emotion = analyzeForEmotion(message, finalResponse, emotionalState);
 
+    // ===== ANALYZE FOR LEARNINGS (Self-Evolution) =====
+    // Will be enabled after Convex types are regenerated
+    // Asynchronously detect if we should learn something from this exchange
+    // try {
+    //   await convex.mutation(api.aiMemory.analyzeForLearnings, {
+    //     userId: userId as Id<"users">,
+    //     userMessage: message,
+    //     aiResponse: finalResponse,
+    //   });
+    // } catch (e) {
+    //   console.log("Learning analysis skipped:", e);
+    // }
+
     return NextResponse.json({
       response: finalResponse,
       emotion,
       videoProcessed: !!videoUrl,
       toolsUsed: toolResults.map(t => t.name),
+      memoryUsed: !!memoryContext,
     });
   } catch (error) {
     console.error("Chat API error:", error);

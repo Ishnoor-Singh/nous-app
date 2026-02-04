@@ -118,13 +118,20 @@ export default defineSchema({
   aiLearnings: defineTable({
     userId: v.id("users"),
     category: v.union(
-      v.literal("correction"),
-      v.literal("knowledge_gap"),
-      v.literal("best_practice"),
-      v.literal("user_preference"),
+      v.literal("correction"),      // User corrected the AI
+      v.literal("preference"),      // User preference discovered  
+      v.literal("knowledge_gap"),   // AI didn't know something
+      v.literal("teaching_style"),  // What teaching approach works
+      v.literal("interest"),        // Topics user is interested in
+      v.literal("context"),         // Important user context
+      v.literal("feedback"),        // Explicit feedback from user
+      v.literal("best_practice"),   // Legacy - best practices learned
+      v.literal("user_preference"), // Legacy - keeping for compatibility
     ),
     summary: v.string(),
     details: v.string(),
+    confidence: v.optional(v.number()), // 0-1 confidence in this learning
+    source: v.optional(v.string()),     // What triggered this learning
     createdAt: v.number(),
     appliedAt: v.optional(v.number()),
   }).index("by_user", ["userId"]),
