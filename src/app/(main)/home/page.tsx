@@ -9,9 +9,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   Brain, Flame, BookOpen, MessageCircle, 
   Sparkles, ChevronRight, Palette, Scale, 
-  Clock, Heart, Target, Check
+  Clock, Heart, Target, Check, ListTodo
 } from "lucide-react";
 import Link from "next/link";
+import { QuickCapture } from "@/components/QuickCapture";
 
 const TOPIC_CONFIG = {
   philosophy: { icon: Brain, color: "topic-philosophy", label: "Philosophy", emoji: "🤔" },
@@ -38,6 +39,7 @@ export default function HomePage() {
   });
   const generateCards = useMutation(api.knowledge.generateDailyCards);
   const syncUser = useMutation(api.users.syncUser);
+  const createTodo = useMutation(api.todos.createTodo);
 
   const [greeting, setGreeting] = useState("");
 
@@ -87,6 +89,19 @@ export default function HomePage() {
   const firstName = userData.user.name?.split(" ")[0] || "friend";
   const completedHabits = habitProgress?.filter(h => h.isCompletedToday).length || 0;
   const totalHabits = habitProgress?.length || 0;
+
+  // Handle quick capture
+  const handleQuickCapture = async (input: string, parsed?: any) => {
+    if (!userData?.user) return;
+    
+    await createTodo({
+      userId: userData.user._id,
+      title: parsed?.title || input,
+      priority: parsed?.priority || undefined,
+      dueDate: parsed?.dueDate || undefined,
+      dueTime: parsed?.dueTime || undefined,
+    });
+  };
 
   return (
     <main className="min-h-dvh p-6 safe-top">
@@ -185,6 +200,29 @@ export default function HomePage() {
           </div>
         </motion.section>
       )}
+
+      {/* Quick Capture */}
+      <motion.section
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.15 }}
+        className="mb-8"
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+            <ListTodo className="w-5 h-5 text-accent" />
+            Quick Capture
+          </h2>
+          <Link href="/tasks" className="text-sm text-accent hover:text-accent/80 transition-colors">
+            View all →
+          </Link>
+        </div>
+        
+        <QuickCapture 
+          onCapture={handleQuickCapture}
+          placeholder="Add a task... 'Call mom tomorrow at 3pm'"
+        />
+      </motion.section>
 
       {/* Today's Discoveries */}
       <section className="mb-8">
