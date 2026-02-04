@@ -8,12 +8,14 @@
  * @module
  */
 
+import type * as aiMemory from "../aiMemory.js";
 import type * as conversations from "../conversations.js";
 import type * as emotions from "../emotions.js";
 import type * as habits from "../habits.js";
 import type * as journal from "../journal.js";
 import type * as knowledge from "../knowledge.js";
 import type * as media from "../media.js";
+import type * as smartTasks from "../smartTasks.js";
 import type * as todos from "../todos.js";
 import type * as users from "../users.js";
 
@@ -24,12 +26,14 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  aiMemory: typeof aiMemory;
   conversations: typeof conversations;
   emotions: typeof emotions;
   habits: typeof habits;
   journal: typeof journal;
   knowledge: typeof knowledge;
   media: typeof media;
+  smartTasks: typeof smartTasks;
   todos: typeof todos;
   users: typeof users;
 }>;
