@@ -10,7 +10,7 @@ import Highlight from "@tiptap/extension-highlight";
 import Link from "@tiptap/extension-link";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import { common, createLowlight } from "lowlight";
-import { useCallback, useEffect, useState, useMemo } from "react";
+import { useCallback, useEffect, useState, useMemo, useRef } from "react";
 import { WikiLink, extractWikiLinks } from "./WikiLinkExtension";
 import {
   Bold,
@@ -34,6 +34,7 @@ const lowlight = createLowlight(common);
 
 interface BlockEditorProps {
   content?: any;
+  noteId?: string; // Used to detect note switches
   placeholder?: string;
   onChange?: (json: any, text: string, wikiLinks: string[]) => void;
   onSave?: () => void;
@@ -44,6 +45,7 @@ interface BlockEditorProps {
 
 export default function BlockEditor({
   content,
+  noteId,
   placeholder = "Start writing, or press '/' for commands...",
   onChange,
   onSave,
@@ -190,12 +192,19 @@ export default function BlockEditor({
     },
   });
 
-  // Update content when prop changes
+  // Only set content when noteId changes (user switched notes)
+  // This prevents resetting content on every keystroke
+  const prevNoteIdRef = useRef<string | undefined>(undefined);
+  
   useEffect(() => {
-    if (editor && content !== undefined && editor.getJSON() !== content) {
+    if (!editor) return;
+    
+    // Only reset content when switching to a different note
+    if (noteId !== prevNoteIdRef.current) {
       editor.commands.setContent(content || "");
+      prevNoteIdRef.current = noteId;
     }
-  }, [content, editor]);
+  }, [noteId, content, editor]);
 
   // Close slash menu when clicking elsewhere
   useEffect(() => {

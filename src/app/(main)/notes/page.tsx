@@ -299,6 +299,7 @@ function DesktopNotesView() {
                 {/* Block Editor */}
                 <BlockEditor
                   content={selectedNote.blocks || selectedNote.content}
+                  noteId={selectedNoteId || undefined}
                   onChange={handleEditorChange}
                   onWikiLinkClick={handleWikiLinkClick}
                   placeholder="Start writing, or press '/' for commands. Use [[note title]] to link notes..."
